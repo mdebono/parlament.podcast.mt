@@ -4,10 +4,14 @@ import requests
 
 CACHE_PATH = 'cache.pkl'
 
-DEFAULT_HEADERS = {
-    'Accept': 'application/json',
-    'User-Agent': 'parlament.podcast.mt/1.0 (+https://github.com/mdebono/parlament.podcast.mt)',
-}
+# Persistent session so cookies are shared across requests within a run
+_session = requests.Session()
+_session.headers.update({
+    'Accept': 'application/json, text/javascript, */*; q=0.01',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'X-Requested-With': 'XMLHttpRequest',
+})
 
 def read_cache():
     print('reading cache')
@@ -25,13 +29,23 @@ def write_cache():
         pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
         print('cache written')
 
-def httpGet(url):
+def httpFetch(url):
+    """Fetch a page without caching, used to establish session cookies."""
+    print('Fetching (no cache): {}'.format(url))
+    response = _session.get(url)
+    if not response.ok:
+        print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
+
+def httpGet(url, referer=None):
     key = ('GET', url)
     if key in cache:
         print('GET from cache: {}'.format(url))
         return cache[key]
     else:
-        response = requests.get(url, headers=DEFAULT_HEADERS)
+        headers = {}
+        if referer:
+            headers['Referer'] = referer
+        response = _session.get(url, headers=headers)
         cache[key] = response
         print('GET added to cache: {}'.format(url))
         write_cache()
@@ -43,7 +57,7 @@ def httpPost(url, data, payload):
         print('POST from cache: {} with POST {}'.format(url, data))
         return cache[key]
     else:
-        response = requests.post(url, data=payload)
+        response = _session.post(url, data=payload)
         cache[key] = response
         print('POST added to cache: {} with POST {}'.format(url, data))
         write_cache()

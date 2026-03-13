@@ -12,7 +12,8 @@ PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
 
 def get_leg():
-    response = cache.httpGet(PARLAMENT_MEDIA_ARCHIVE_API_URL)
+    cache.httpFetch(PARLAMENT_MEDIA_ARCHIVE_URL)
+    response = cache.httpGet(PARLAMENT_MEDIA_ARCHIVE_API_URL, referer=PARLAMENT_MEDIA_ARCHIVE_URL)
     response.raise_for_status()
     return response.json()
 
