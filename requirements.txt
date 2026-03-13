@@ -2,3 +2,4 @@ requests
 feedgenerator
 babel
 lxml
+pytz

@@ -1,0 +1,41 @@
+name: Run
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      do_run:
+        description: 'Set to "true" to run the parliament script'
+        required: false
+        default: 'true'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: >
+      (github.event_name == 'schedule' && vars.DO_RUN == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.do_run == 'true')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run parliament script
+        run: python -m parlament
+
+      - name: Upload podcast.rss artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: podcast-rss
+          path: podcast.rss
