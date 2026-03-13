@@ -1,7 +1,7 @@
 # Podcast Feed
 
 from feedgenerator import Rss201rev2Feed
-from feedgenerator import force_text, iri_to_uri
+from feedgenerator import iri_to_uri
 
 class PodcastFeed(Rss201rev2Feed):
     ns = "xmlns:itunes"
