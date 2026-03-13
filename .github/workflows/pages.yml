@@ -1,0 +1,56 @@
+name: Deploy Pages
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      do_pages:
+        description: 'Set to "true" to deploy GitHub Pages'
+        required: false
+        default: 'true'
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'schedule' && vars.DO_PAGES == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.do_pages == 'true')
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run parliament script
+        run: python -m parlament
+
+      - name: Copy RSS to public directory
+        run: mkdir -p public && cp podcast.rss public/rss
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
