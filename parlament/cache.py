@@ -4,6 +4,11 @@ import requests
 
 CACHE_PATH = 'cache.pkl'
 
+DEFAULT_HEADERS = {
+    'Accept': 'application/json',
+    'User-Agent': 'parlament.podcast.mt/1.0 (+https://github.com/mdebono/parlament.podcast.mt)',
+}
+
 def read_cache():
     print('reading cache')
     if Path(CACHE_PATH).exists():
@@ -26,7 +31,7 @@ def httpGet(url):
         print('GET from cache: {}'.format(url))
         return cache[key]
     else:
-        response = requests.get(url)
+        response = requests.get(url, headers=DEFAULT_HEADERS)
         cache[key] = response
         print('GET added to cache: {}'.format(url))
         write_cache()
