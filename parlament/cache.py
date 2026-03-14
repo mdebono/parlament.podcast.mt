@@ -1,3 +1,4 @@
+import atexit
 import json as _json
 import pickle
 from pathlib import Path
@@ -21,10 +22,11 @@ class _CachedResponse:
     pickled. This class stores only the data fields we need and exposes the
     same subset of the requests.Response interface used by callers.
     """
-    def __init__(self, status_code, content, url):
+    def __init__(self, status_code, content, url, headers=None):
         self.status_code = status_code
         self.content = content
         self.url = url
+        self.headers = headers or {}
 
     def raise_for_status(self):
         if 400 <= self.status_code < 500:
@@ -42,7 +44,12 @@ class _CachedResponse:
 
 def _to_cached(response):
     """Convert a live curl_cffi Response to a picklable _CachedResponse."""
-    return _CachedResponse(response.status_code, response.content, str(response.url))
+    return _CachedResponse(
+        response.status_code,
+        response.content,
+        str(response.url),
+        {k.lower(): v for k, v in response.headers.items()},
+    )
 
 def read_cache():
     print('reading cache')
@@ -66,6 +73,19 @@ def httpFetch(url):
     response = _session.get(url, timeout=HTTP_TIMEOUT)
     if not response.ok:
         print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
+
+def httpHead(url):
+    key = ('HEAD', url)
+    if key in cache:
+        print('HEAD from cache: {}'.format(url))
+        return cache[key]
+    else:
+        response = _session.head(url, timeout=HTTP_TIMEOUT)
+        if not response.ok:
+            print('Warning: HEAD request returned HTTP {}: {}'.format(response.status_code, url))
+        cache[key] = _to_cached(response)
+        print('HEAD added to cache: {}'.format(url))
+        return cache[key]
 
 def httpGet(url, referer=None):
     key = ('GET', url)
@@ -104,3 +124,7 @@ def httpPost(url, payload, referer=None):
         return cache[key]
 
 cache = read_cache()
+# HEAD responses are batched and written once at process exit. Note: atexit
+# handlers do not run on abnormal termination (SIGKILL, hard crash). In that
+# case the HEAD entries are simply re-fetched on the next run.
+atexit.register(write_cache)

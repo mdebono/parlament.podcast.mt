@@ -1,6 +1,8 @@
 # Parlament Podcast Feed
 
 from parlament.podcastfeed import PodcastFeed
+from parlament import cache
+from curl_cffi import requests
 from feedgenerator import Enclosure
 
 from lxml import etree
@@ -20,11 +22,17 @@ def init_feed():
     )
 
 def add_item(feed, title, description, link, audio_url, duration=None, pubdate=None):
+    try:
+        response = cache.httpHead(audio_url)
+        content_length = response.headers.get('content-length', '')
+    except requests.exceptions.RequestException as e:
+        print('Warning: could not fetch Content-Length for {}: {}'.format(audio_url, e))
+        content_length = ''
     feed.add_item(
         title=title,
         description=description,
         link=link,
-        enclosures=[Enclosure(url=audio_url, length='', mime_type="audio/mpeg")],
+        enclosures=[Enclosure(url=audio_url, length=content_length, mime_type="audio/mpeg")],
         unique_id=audio_url,
         duration=duration,
         pubdate=pubdate,
