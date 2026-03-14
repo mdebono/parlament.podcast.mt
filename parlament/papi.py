@@ -1,7 +1,7 @@
 # Parlament API
 
 from datetime import datetime
-import json, pytz, babel.dates
+import pytz, babel.dates
 
 from parlament import cache
 
@@ -12,8 +12,10 @@ PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
 
 def get_leg():
-    leg_string = cache.httpPost(PARLAMENT_MEDIA_ARCHIVE_API_URL, None, None).content
-    return json.loads(leg_string)
+    cache.httpFetch(PARLAMENT_MEDIA_ARCHIVE_URL)
+    response = cache.httpPost(PARLAMENT_MEDIA_ARCHIVE_API_URL, None, referer=PARLAMENT_MEDIA_ARCHIVE_URL)
+    response.raise_for_status()
+    return response.json()
 
 def get_leg_title(leg, lang='mt'):
     if lang == 'mt':
