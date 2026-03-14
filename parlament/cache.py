@@ -1,3 +1,4 @@
+import atexit
 import json as _json
 import pickle
 from pathlib import Path
@@ -43,7 +44,12 @@ class _CachedResponse:
 
 def _to_cached(response):
     """Convert a live curl_cffi Response to a picklable _CachedResponse."""
-    return _CachedResponse(response.status_code, response.content, str(response.url), dict(response.headers))
+    return _CachedResponse(
+        response.status_code,
+        response.content,
+        str(response.url),
+        {k.lower(): v for k, v in response.headers.items()},
+    )
 
 def read_cache():
     print('reading cache')
@@ -79,7 +85,6 @@ def httpHead(url):
             print('Warning: HEAD request returned HTTP {}: {}'.format(response.status_code, url))
         cache[key] = _to_cached(response)
         print('HEAD added to cache: {}'.format(url))
-        write_cache()
         return cache[key]
 
 def httpGet(url, referer=None):
@@ -119,3 +124,7 @@ def httpPost(url, payload, referer=None):
         return cache[key]
 
 cache = read_cache()
+# HEAD responses are batched and written once at process exit. Note: atexit
+# handlers do not run on abnormal termination (SIGKILL, hard crash). In that
+# case the HEAD entries are simply re-fetched on the next run.
+atexit.register(write_cache)
