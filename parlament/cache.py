@@ -1,19 +1,15 @@
 import pickle
 from pathlib import Path
-import requests
+from curl_cffi import requests
 
 CACHE_PATH = 'cache.pkl'
 
-# Persistent session so cookies are shared across requests within a run.
-# Only set headers that are safe to send on every request type (page loads
-# and AJAX alike). Do NOT include X-Requested-With here — real browsers only
-# send that header on AJAX calls, never on normal page loads.
-_session = requests.Session()
-_session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-})
+# Session that impersonates Chrome at the TLS and HTTP level.
+# Parliament.mt uses WAF/bot detection based on TLS fingerprinting (JA3): a
+# request with Chrome HTTP headers but Python's TLS signature is flagged as a
+# bot and blocked with 403. curl-cffi makes the TLS handshake and HTTP/2
+# settings identical to real Chrome, bypassing this check.
+_session = requests.Session(impersonate="chrome136")
 
 def read_cache():
     print('reading cache')
@@ -34,10 +30,7 @@ def write_cache():
 def httpFetch(url):
     """Fetch an HTML page without caching, used to establish session cookies."""
     print('Fetching (no cache): {}'.format(url))
-    response = _session.get(url, headers={
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Upgrade-Insecure-Requests': '1',
-    })
+    response = _session.get(url)
     if not response.ok:
         print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
 
