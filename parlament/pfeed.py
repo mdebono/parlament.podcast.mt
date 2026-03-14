@@ -10,10 +10,10 @@ UTF8 = 'utf8'
 def init_feed():
     return PodcastFeed(
         title="Il-Podcast tal-Parlament",
-        link="https://parlament.mdebono.com/",
+        link="https://parlament.podcast.mt/",
         description="Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-Parlament ta' Malta. Is-seduti jiġu ppublikati hawn il-ġurnata ta' wara li jseħħu. Għal aktar informazzjoni, żur is-sit ta' dan il-podcast.",
         language="mt",
-        image_url = "https://parlament.mdebono.com/img/parlament-logo.jpg",
+        image_url = "https://parlament.podcast.mt/img/parlament-logo.jpg",
         owner="parlament@mdebono.com",
         author="Il-Parlament ta' Malta",
         category="News & Politics",
