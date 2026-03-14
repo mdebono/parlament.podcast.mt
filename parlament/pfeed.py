@@ -24,7 +24,8 @@ def add_item(feed, title, description, link, audio_url, duration=None, pubdate=N
         title=title,
         description=description,
         link=link,
-        enclosure=Enclosure(url=audio_url, length='', mime_type="audio/mpeg"),
+        enclosures=[Enclosure(url=audio_url, length='0', mime_type="audio/mpeg")],
+        unique_id=audio_url,
         duration=duration,
         pubdate=pubdate,
     )
