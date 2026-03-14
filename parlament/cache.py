@@ -4,6 +4,7 @@ from pathlib import Path
 from curl_cffi import requests
 
 CACHE_PATH = 'cache.pkl'
+HTTP_TIMEOUT = 30  # seconds
 
 # Session that impersonates Chrome at the TLS and HTTP level.
 # Parliament.mt uses WAF/bot detection based on TLS fingerprinting (JA3): a
@@ -62,7 +63,7 @@ def write_cache():
 def httpFetch(url):
     """Fetch an HTML page without caching, used to establish session cookies."""
     print('Fetching (no cache): {}'.format(url))
-    response = _session.get(url)
+    response = _session.get(url, timeout=HTTP_TIMEOUT)
     if not response.ok:
         print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
 
@@ -78,7 +79,7 @@ def httpGet(url, referer=None):
         }
         if referer:
             headers['Referer'] = referer
-        response = _session.get(url, headers=headers)
+        response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         cache[key] = _to_cached(response)
         print('GET added to cache: {}'.format(url))
         write_cache()
@@ -96,7 +97,7 @@ def httpPost(url, payload, referer=None):
         }
         if referer:
             headers['Referer'] = referer
-        response = _session.post(url, data=payload, headers=headers)
+        response = _session.post(url, data=payload, headers=headers, timeout=HTTP_TIMEOUT)
         cache[key] = _to_cached(response)
         print('POST added to cache: {} with POST {}'.format(url, payload))
         write_cache()
