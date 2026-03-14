@@ -25,6 +25,7 @@ class TestParlamentFeed(unittest.TestCase):
             "Each feed item must have exactly one enclosure (media file)")
         enclosure = item['enclosures'][0]
         self.assertEqual(enclosure.url, audio_url)
+        self.assertEqual(enclosure.length, '')
         self.assertEqual(enclosure.mime_type, 'audio/mpeg')
 
     def test_add_item_guid_present(self):
