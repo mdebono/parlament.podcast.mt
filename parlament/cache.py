@@ -1,3 +1,4 @@
+import json as _json
 import pickle
 from pathlib import Path
 from curl_cffi import requests
@@ -10,6 +11,37 @@ CACHE_PATH = 'cache.pkl'
 # bot and blocked with 403. curl-cffi makes the TLS handshake and HTTP/2
 # settings identical to real Chrome, bypassing this check.
 _session = requests.Session(impersonate="chrome136")
+
+
+class _CachedResponse:
+    """Picklable snapshot of an HTTP response.
+
+    curl_cffi Response objects hold CFFI C-extension references that cannot be
+    pickled. This class stores only the data fields we need and exposes the
+    same subset of the requests.Response interface used by callers.
+    """
+    def __init__(self, status_code, content, url):
+        self.status_code = status_code
+        self.content = content
+        self.url = url
+
+    def raise_for_status(self):
+        if 400 <= self.status_code < 500:
+            raise requests.exceptions.HTTPError(
+                '{} Client Error for url: {}'.format(self.status_code, self.url)
+            )
+        elif 500 <= self.status_code < 600:
+            raise requests.exceptions.HTTPError(
+                '{} Server Error for url: {}'.format(self.status_code, self.url)
+            )
+
+    def json(self):
+        return _json.loads(self.content)
+
+
+def _to_cached(response):
+    """Convert a live curl_cffi Response to a picklable _CachedResponse."""
+    return _CachedResponse(response.status_code, response.content, str(response.url))
 
 def read_cache():
     print('reading cache')
@@ -47,10 +79,10 @@ def httpGet(url, referer=None):
         if referer:
             headers['Referer'] = referer
         response = _session.get(url, headers=headers)
-        cache[key] = response
+        cache[key] = _to_cached(response)
         print('GET added to cache: {}'.format(url))
         write_cache()
-        return response
+        return cache[key]
 
 def httpPost(url, payload, referer=None):
     key = ('POST', payload, url)
@@ -65,9 +97,9 @@ def httpPost(url, payload, referer=None):
         if referer:
             headers['Referer'] = referer
         response = _session.post(url, data=payload, headers=headers)
-        cache[key] = response
+        cache[key] = _to_cached(response)
         print('POST added to cache: {} with POST {}'.format(url, payload))
         write_cache()
-        return response
+        return cache[key]
 
 cache = read_cache()
