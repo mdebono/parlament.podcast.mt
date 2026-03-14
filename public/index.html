@@ -4,58 +4,79 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Il-Podcast tal-Parlament</title>
+        <meta name="description" content="Ġabra inuffiċjali tas-seduti tal-Parlament ta' Malta f'forma ta' podcast.">
         <link type="application/rss+xml" rel="alternate" title="Il-Podcast tal-Parlament" href="https://parlament.podcast.mt/rss/podcast.rss"/>
-        <style>
-            body {
-                font-family: sans-serif;
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 1em;
-            }
-            .badges {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.75em;
-                align-items: center;
-                margin-bottom: 1em;
-            }
-            .badges a {
-                display: inline-flex;
-                align-items: center;
-                text-decoration: none;
-            }
-        </style>
+        <link rel="stylesheet" href="css/style.css">
     </head>
     <body>
-        <h1>Il-Podcast tal-Parlament</h1>
 
-        <div class="badges">
-            <a href="https://open.spotify.com/show/41wjGno413H9zT7NEJZxs6">
-                <img src="img/spotify-podcast-badge-wht-grn-165x40.svg" height="40" alt="Listen on Spotify"></a>
+        <!-- Hero -->
+        <header class="hero">
+            <div class="hero-inner">
+                <img class="hero-logo" src="img/parlament-logo.jpg" alt="Parlament ta' Malta logo">
+                <h1>Il-Podcast tal-<span>Parlament</span></h1>
+                <p class="hero-subtitle">Is-seduti tal-Parlament ta' Malta f'forma ta' podcast — aċċessibbli, b'xejn, u aġġornat kull jum.</p>
+            </div>
+        </header>
 
-            <a href="https://podcasts.apple.com/us/podcast/il-podcast-tal-parlament/id1657492240?itsct=podcast_box_badge&amp;itscg=30200&amp;ls=1" style="overflow: hidden; border-radius: 13px; height: 40px;">
-                <img src="https://tools.applemediaservices.com/api/badges/listen-on-apple-podcasts/badge/en-us?size=250x83&amp;releaseDate=1669820400&h=954d2b16116d54492a51d98b7aefca2b" alt="Listen on Apple Podcasts" style="border-radius: 13px; height: 40px;"></a>
+        <!-- Listen On -->
+        <section class="listen-section">
+            <h2>Isma' fuq</h2>
+            <div class="badges">
+                <a class="badge-link" href="https://open.spotify.com/show/41wjGno413H9zT7NEJZxs6" title="Listen on Spotify">
+                    <img src="img/spotify-podcast-badge-wht-grn-165x40.svg" height="40" alt="Listen on Spotify">
+                </a>
 
-            <a href="https://parlament.podcast.mt/rss/podcast.rss" title="RSS Feed">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" aria-label="RSS Feed">
-                    <rect width="24" height="24" rx="4" fill="#f26522"/>
-                    <circle cx="6.18" cy="17.82" r="2.18" fill="white"/>
-                    <path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z" fill="white"/>
-                </svg>
-            </a>
+                <a class="badge-link" href="https://podcasts.apple.com/us/podcast/il-podcast-tal-parlament/id1657492240?itsct=podcast_box_badge&amp;itscg=30200&amp;ls=1" title="Listen on Apple Podcasts">
+                    <img src="img/apple-podcasts-badge.svg" height="40" alt="Listen on Apple Podcasts">
+                </a>
+            </div>
+        </section>
 
-            <a href="https://github.com/mdebono/parlament.podcast.mt" title="GitHub">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="40" height="40" aria-label="GitHub">
-                    <path fill="#181717" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-            </a>
-        </div>
+        <!-- RSS & GitHub links -->
+        <section class="links-section">
+            <h2>Links</h2>
+            <div class="icon-links">
+                <a class="icon-link" href="https://parlament.podcast.mt/rss/podcast.rss" title="RSS Feed">
+                    <svg class="icon-rss" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <circle cx="6.18" cy="17.82" r="2.18" fill="currentColor"/>
+                        <path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z" fill="currentColor"/>
+                    </svg>
+                    RSS Feed
+                </a>
 
-        <p>Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-<a href="https://parlament.mt/">Parlament ta' Malta</a>.</p>
-        <p>Primarjament qed inpoġġu s-seduti tal-Erbatax-il Leġislatura, jiġifieri dik li bdiet f'Mejju 2022.
-            Kull lejl tiġi ċċekjata s-sit uffiċjali tal-Parlament għal seduti ġodda u dawn jiżdiedu bħala episodji f'dan il-podcast.
-            B'hekk kull seduta ġdida tkun parti minn dan il-podcast il-ġurnata ta' wara.</p>
-        <p>Dan il-podcast huwa biss ġabra tas-seduti f'forma utli ta' episodji f'podcast, jiġifieri l-episodji jinstemgħu direttament mis-sit tal-Parlament.</p>
-        <p><strong>Ċaħda</strong>: Dan il-Podcast mhux ikkontrollat mill-Parlament jew mill-Gvern ta' Malta u mhu bl-ebda mod jipprova jirrappreżenta l-ebda minnhom.</p>
+                <a class="icon-link" href="https://github.com/mdebono/parlament.podcast.mt" title="GitHub">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                        <path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </section>
+
+        <!-- Main content cards -->
+        <main>
+            <article class="card">
+                <h2>Dwar il-Podcast</h2>
+                <p>Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-<a href="https://parlament.mt/">Parlament ta' Malta</a>.</p>
+                <p>Primarjament qed inpoġġu s-seduti tal-Erbatax-il Leġislatura, jiġifieri dik li bdiet f'Mejju 2022.</p>
+            </article>
+
+            <article class="card">
+                <h2>Kif Jaħdem</h2>
+                <p>Kull lejl tiġi ċċekjata s-sit uffiċjali tal-Parlament għal seduti ġodda u dawn jiżdiedu bħala episodji f'dan il-podcast. B'hekk kull seduta ġdida tkun parti minn dan il-podcast il-ġurnata ta' wara.</p>
+                <p>Dan il-podcast huwa biss ġabra tas-seduti f'forma utli ta' episodji f'podcast — l-episodji jinstemgħu direttament mis-sit tal-Parlament.</p>
+            </article>
+
+            <article class="card disclaimer">
+                <h2>Ċaħda</h2>
+                <p>Dan il-Podcast <strong>mhux ikkontrollat</strong> mill-Parlament jew mill-Gvern ta' Malta u mhu bl-ebda mod jipprova jirrappreżenta l-ebda minnhom.</p>
+            </article>
+        </main>
+
+        <footer>
+            <p>Sors miftuħ · <a href="https://github.com/mdebono/parlament.podcast.mt">GitHub</a> · <a href="https://parlament.podcast.mt/rss/podcast.rss">RSS Feed</a></p>
+        </footer>
+
     </body>
 </html>
