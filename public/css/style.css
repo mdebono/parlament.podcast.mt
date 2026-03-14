@@ -13,7 +13,9 @@
     --shadow: 0 4px 24px rgba(13,31,60,.12);
 }
 
-html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+}
 
 body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -155,6 +157,7 @@ body {
     transform: translateY(-2px);
 }
 .icon-link svg { flex-shrink: 0; }
+.icon-rss { color: var(--rss); }
 
 /* ── Main content ── */
 main {
