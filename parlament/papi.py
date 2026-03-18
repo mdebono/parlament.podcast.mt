@@ -1,9 +1,15 @@
 # Parlament API
 
 from datetime import datetime
+import re
 import pytz, babel.dates
 
 from parlament import cache
+
+_PLENARY_AUDIO_RE = re.compile(
+    r'^(.*/)Plenary((?:%20)+)(\d+)%20(\d{2}-\d{2}-\d{4})%20(\d{4})hrs\.mp3$',
+    re.IGNORECASE,
+)
 
 LEGISLATURE_ID = '506899'
 PARLAMENT_URL = 'https://parlament.mt'
@@ -60,6 +66,52 @@ def get_episode_title(leg, sitting):
         season = get_leg_number(leg),
         episode = get_sitting_number(sitting),
     )
+
+def correct_audio_url(sitting, audio_url):
+    """If the episode number embedded in *audio_url* doesn't match the sitting
+    number, try to build a corrected URL and verify it with an HTTP HEAD
+    request.  Returns the corrected URL when the HEAD succeeds (2xx), or the
+    original URL unchanged when it either already matches, uses an unrecognised
+    format, or the corrected URL cannot be verified."""
+    sitting_number = get_sitting_number(sitting)
+    m = _PLENARY_AUDIO_RE.match(audio_url)
+    if m is None:
+        return audio_url
+    base, sep, url_episode_str = m.group(1), m.group(2), m.group(3)
+    if int(url_episode_str) == sitting_number:
+        return audio_url
+
+    date = get_sitting_date(sitting)
+    new_url = (
+        '{base}Plenary{sep}{ep:03d}%20{d:02d}-{mo:02d}-{y:04d}%20{h:02d}{mi:02d}hrs.mp3'
+        .format(
+            base=base,
+            sep=sep,
+            ep=sitting_number,
+            d=date.day, mo=date.month, y=date.year,
+            h=date.hour, mi=date.minute,
+        )
+    )
+    print(
+        'Warning: sitting {:03d} contains wrong episode {:s}\n'
+        'with URL: {}\n'
+        'trying corrected URL: {}'.format(sitting_number, url_episode_str, audio_url, new_url)
+    )
+    try:
+        response = cache.httpHead(new_url)
+        if 200 <= response.status_code < 300:
+            print('Corrected URL verified (HTTP {}): {}'.format(response.status_code, new_url))
+            return new_url
+        else:
+            print(
+                'Warning: corrected URL returned HTTP {} - keeping original'.format(
+                    response.status_code
+                )
+            )
+    except Exception as e:
+        print('Warning: could not verify corrected URL: {} - keeping original'.format(e))
+    return audio_url
+
 
 def get_episode_description(leg, sitting):
     text = '{leg_title} Seduta Nru: {episode:03} - {date}'
