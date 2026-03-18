@@ -7,7 +7,7 @@ import pytz, babel.dates
 from parlament import cache
 
 _PLENARY_AUDIO_RE = re.compile(
-    r'^(.*/)Plenary(?:%20)+(\d+)%20(\d{2}-\d{2}-\d{4})%20(\d{4})hrs\.mp3$',
+    r'^(.*/)Plenary((?:%20)+)(\d+)%20(\d{2}-\d{2}-\d{4})%20(\d{4})hrs\.mp3$',
     re.IGNORECASE,
 )
 
@@ -77,15 +77,16 @@ def correct_audio_url(sitting, audio_url):
     m = _PLENARY_AUDIO_RE.match(audio_url)
     if m is None:
         return audio_url
-    base, url_episode_str = m.group(1), m.group(2)
+    base, sep, url_episode_str = m.group(1), m.group(2), m.group(3)
     if int(url_episode_str) == sitting_number:
         return audio_url
 
     date = get_sitting_date(sitting)
     new_url = (
-        '{base}Plenary%20{ep:03d}%20{d:02d}-{mo:02d}-{y:04d}%20{h:02d}{mi:02d}hrs.mp3'
+        '{base}Plenary{sep}{ep:03d}%20{d:02d}-{mo:02d}-{y:04d}%20{h:02d}{mi:02d}hrs.mp3'
         .format(
             base=base,
+            sep=sep,
             ep=sitting_number,
             d=date.day, mo=date.month, y=date.year,
             h=date.hour, mi=date.minute,

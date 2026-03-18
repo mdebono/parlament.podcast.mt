@@ -100,7 +100,8 @@ class TestCorrectAudioUrl(unittest.TestCase):
         # URL has Plenary%20%20270 (extra space) and wrong episode number
         double_space_url = _BASE + 'Plenary%20%20272%2030-10-2024%201600hrs.mp3'
         sitting = _make_sitting(270, '2024-10-30T16:00:00')
-        expected = _BASE + 'Plenary%20270%2030-10-2024%201600hrs.mp3'
+        # corrected URL must preserve the double space
+        expected = _BASE + 'Plenary%20%20270%2030-10-2024%201600hrs.mp3'
         result = papi.correct_audio_url(sitting, double_space_url)
         self.assertEqual(result, expected)
         mock_head.assert_called_once_with(expected)
