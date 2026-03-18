@@ -7,7 +7,7 @@ def run():
 
     feed = pfeed.init_feed()
     seen_guids = set()
-    for sitting in sittings:
+    for sitting in reversed(sittings):
         audio_url = papi.get_sitting_audio_url(sitting)
         audio_url = papi.correct_audio_url(sitting, audio_url)
         if audio_url in seen_guids:
