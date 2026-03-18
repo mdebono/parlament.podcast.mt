@@ -7,7 +7,7 @@ import pytz, babel.dates
 from parlament import cache
 
 _PLENARY_AUDIO_RE = re.compile(
-    r'^(.*/)Plenary%20(\d+)%20(\d{2}-\d{2}-\d{4})%20(\d{4})hrs\.mp3$',
+    r'^(.*/)Plenary(?:%20)+(\d+)%20(\d{2}-\d{2}-\d{4})%20(\d{4})hrs\.mp3$',
     re.IGNORECASE,
 )
 

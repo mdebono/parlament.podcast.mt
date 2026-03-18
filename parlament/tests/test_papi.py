@@ -92,6 +92,28 @@ class TestCorrectAudioUrl(unittest.TestCase):
         self.assertEqual(result, url)
         mock_head.assert_not_called()
 
+    # ------------------------------------------------------------------
+    # double-space in URL (Plenary%20%20270) → parsed and corrected
+    # ------------------------------------------------------------------
+    @patch('parlament.papi.cache.httpHead', return_value=_head_response(200))
+    def test_double_space_mismatch_corrected(self, mock_head):
+        # URL has Plenary%20%20270 (extra space) and wrong episode number
+        double_space_url = _BASE + 'Plenary%20%20272%2030-10-2024%201600hrs.mp3'
+        sitting = _make_sitting(270, '2024-10-30T16:00:00')
+        expected = _BASE + 'Plenary%20270%2030-10-2024%201600hrs.mp3'
+        result = papi.correct_audio_url(sitting, double_space_url)
+        self.assertEqual(result, expected)
+        mock_head.assert_called_once_with(expected)
+
+    @patch('parlament.papi.cache.httpHead')
+    def test_double_space_already_correct_episode_no_head(self, mock_head):
+        # Episode number matches despite the double space – no HEAD needed
+        double_space_url = _BASE + 'Plenary%20%20270%2030-10-2024%201600hrs.mp3'
+        sitting = _make_sitting(270, '2024-10-30T16:00:00')
+        result = papi.correct_audio_url(sitting, double_space_url)
+        self.assertEqual(result, double_space_url)
+        mock_head.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
