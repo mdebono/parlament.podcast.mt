@@ -111,7 +111,7 @@ def httpGetFile(url, file_path, referer=None):
     If already cached, skip download and return cached metadata.
     """
     key = ('GETFILE', url, file_path)
-    if key in cache:
+    if key in cache and Path(file_path).exists():
         print(f'GETFILE from cache: {url} -> {file_path}')
         meta = cache[key]
         # Attach file_path as .file_path for convenience
