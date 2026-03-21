@@ -19,7 +19,7 @@ PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
 
 def get_leg():
-    cache.httpFetch(PARLAMENT_MEDIA_ARCHIVE_URL)
+    cache.httpGet(PARLAMENT_MEDIA_ARCHIVE_URL)
     response = cache.httpPost(PARLAMENT_MEDIA_ARCHIVE_API_URL, None, referer=PARLAMENT_MEDIA_ARCHIVE_URL)
     response.raise_for_status()
     return response.json()
@@ -46,6 +46,15 @@ def get_sitting_audio_url(sitting):
         audio_url = audio_url[0]['Url']
         audio_url = correct_audio_url(sitting, audio_url)
         return R2_PARLAMENT_URL + audio_url
+
+def get_audio_content_length(audio_url):
+    """Return the Content-Length header value for the given audio_url, or '' if unavailable."""
+    try:
+        response = cache.httpHead(audio_url)
+        return response.headers.get('content-length', '')
+    except Exception as e:
+        print(f'Warning: could not fetch Content-Length for {audio_url}: {e}')
+        return ''
 
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
