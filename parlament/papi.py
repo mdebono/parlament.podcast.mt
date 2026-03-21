@@ -13,7 +13,6 @@ _PLENARY_AUDIO_RE = re.compile(
 
 LEGISLATURE_ID = '506899'
 PARLAMENT_URL = 'https://parlament.mt'
-R2_PARLAMENT_URL = 'https://r2.parlament.podcast.mt'
 PARLAMENT_MEDIA_ARCHIVE_URL = PARLAMENT_URL + '/en/menues/reference-material/archives/media-archive/'
 PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/GetMediaForLegislature/?lang=mt&legislatureId=' + LEGISLATURE_ID
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
@@ -47,7 +46,7 @@ def get_bare_audio_url(sitting):
         return correct_audio_url(sitting, audio_url)
 
 def get_sitting_audio_url(sitting):
-        return R2_PARLAMENT_URL + get_bare_audio_url(sitting)
+        return PARLAMENT_URL + get_bare_audio_url(sitting)
 
 def get_audio_content_length(audio_url):
     """Return the Content-Length header value for the given audio_url, or '' if unavailable."""
@@ -125,7 +124,6 @@ def correct_audio_url(sitting, audio_url):
     except Exception as e:
         print('Warning: could not verify corrected URL: {} - keeping original'.format(e))
     return audio_url
-
 
 def get_episode_description(leg, sitting):
     text = '{leg_title} Seduta Nru: {episode:03} - {date}'
