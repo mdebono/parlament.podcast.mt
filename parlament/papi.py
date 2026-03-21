@@ -43,7 +43,9 @@ def get_sitting_audio_url(sitting):
     if len(audio_url) == 0:
         raise Exception('audio not found for sitting ' + get_sitting_number(sitting))
     else:
-        return R2_PARLAMENT_URL + audio_url[0]['Url']
+        audio_url = audio_url[0]['Url']
+        audio_url = correct_audio_url(sitting, audio_url)
+        return R2_PARLAMENT_URL + audio_url
 
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
@@ -99,7 +101,7 @@ def correct_audio_url(sitting, audio_url):
         'trying corrected URL: {}'.format(sitting_number, url_episode_str, audio_url, new_url)
     )
     try:
-        response = cache.httpHead(new_url)
+        response = cache.httpHead(PARLAMENT_URL + new_url)
         if 200 <= response.status_code < 300:
             print('Corrected URL verified (HTTP {}): {}'.format(response.status_code, new_url))
             return new_url
