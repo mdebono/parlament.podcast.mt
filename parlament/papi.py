@@ -13,6 +13,7 @@ _PLENARY_AUDIO_RE = re.compile(
 
 LEGISLATURE_ID = '506899'
 PARLAMENT_URL = 'https://parlament.mt'
+R2_PARLAMENT_URL = 'https://r2.parlament.podcast.mt'
 PARLAMENT_MEDIA_ARCHIVE_URL = PARLAMENT_URL + '/en/menues/reference-material/archives/media-archive/'
 PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/GetMediaForLegislature/?lang=mt&legislatureId=' + LEGISLATURE_ID
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
@@ -42,7 +43,7 @@ def get_sitting_audio_url(sitting):
     if len(audio_url) == 0:
         raise Exception('audio not found for sitting ' + get_sitting_number(sitting))
     else:
-        return PARLAMENT_URL + audio_url[0]['Url']
+        return R2_PARLAMENT_URL + audio_url[0]['Url']
 
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
