@@ -8,7 +8,9 @@ from parlament import papi
 # helpers
 # ---------------------------------------------------------------------------
 
-_BASE = 'https://parlament.mt/Audio/14thLeg/Plenary/'
+
+# Use only the path, not the domain, to match how correct_audio_url constructs new_url
+_BASE = '/Audio/14thLeg/Plenary/'
 _WRONG_URL = _BASE + 'Plenary%20172%2015-11-2023%200900hrs.mp3'   # episode 172
 _RIGHT_URL  = _BASE + 'Plenary%20171%2014-11-2023%201600hrs.mp3'  # episode 171
 
@@ -61,7 +63,7 @@ class TestCorrectAudioUrl(unittest.TestCase):
         sitting = self._sitting171()
         result = papi.correct_audio_url(sitting, _WRONG_URL)
         self.assertEqual(result, _RIGHT_URL)
-        mock_head.assert_called_once_with(_RIGHT_URL)
+        mock_head.assert_called_once_with(papi.PARLAMENT_URL + _RIGHT_URL)
 
     # ------------------------------------------------------------------
     # mismatch + HEAD 404 → original URL kept
@@ -87,7 +89,7 @@ class TestCorrectAudioUrl(unittest.TestCase):
     @patch('parlament.papi.cache.httpHead')
     def test_unrecognised_url_unchanged(self, mock_head):
         sitting = self._sitting171()
-        url = 'https://parlament.mt/Audio/custom_format.mp3'
+        url = '/Audio/custom_format.mp3'
         result = papi.correct_audio_url(sitting, url)
         self.assertEqual(result, url)
         mock_head.assert_not_called()
@@ -104,7 +106,7 @@ class TestCorrectAudioUrl(unittest.TestCase):
         expected = _BASE + 'Plenary%20%20270%2030-10-2024%201600hrs.mp3'
         result = papi.correct_audio_url(sitting, double_space_url)
         self.assertEqual(result, expected)
-        mock_head.assert_called_once_with(expected)
+        mock_head.assert_called_once_with(papi.PARLAMENT_URL + expected)
 
     @patch('parlament.papi.cache.httpHead')
     def test_double_space_already_correct_episode_no_head(self, mock_head):

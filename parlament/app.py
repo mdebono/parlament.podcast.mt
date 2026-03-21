@@ -9,7 +9,6 @@ def run():
     seen_guids = set()
     for sitting in list(reversed(sittings))[:10]:
         audio_url = papi.get_sitting_audio_url(sitting)
-        audio_url = papi.correct_audio_url(sitting, audio_url)
         if audio_url in seen_guids:
             print(f"WARNING: Duplicate GUID for sitting {papi.get_sitting_number(sitting)}: {audio_url}", file=sys.stderr)
         seen_guids.add(audio_url)
