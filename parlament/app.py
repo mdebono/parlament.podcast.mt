@@ -9,17 +9,18 @@ def run():
     sittings = papi.get_plenary_sittings(leg)
 
     feed = pfeed.init_feed()
-    seen_guids = set()
-    for sitting in list(reversed(sittings))[:10]:
+    seen_urls = set()
+    for sitting in list(reversed(sittings))[:1]:
+        s3_key = papi.get_bare_audio_url(sitting)
+        if s3_key in seen_urls:
+            print(f"WARNING: Duplicate URL for sitting {papi.get_sitting_number(sitting)}: {s3_key}", file=sys.stderr)
+        seen_urls.add(s3_key)
+
         audio_url = papi.get_sitting_audio_url(sitting)
-        if audio_url in seen_guids:
-            print(f"WARNING: Duplicate GUID for sitting {papi.get_sitting_number(sitting)}: {audio_url}", file=sys.stderr)
-        seen_guids.add(audio_url)
 
         # Mirror audio to R2 and use the R2 URL in the feed
-        r2_key = os.path.basename(audio_url)
         try:
-            r2_url = mirror.mirror_audio_to_r2(audio_url, r2_key)
+            r2_url = mirror.mirror_audio_to_r2(audio_url, s3_key)
         except Exception as e:
             print(f"Error mirroring {audio_url} to R2: {e}", file=sys.stderr)
             continue  # skip this item if mirroring fails
