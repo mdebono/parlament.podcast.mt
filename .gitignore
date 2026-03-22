@@ -5,6 +5,8 @@
 cache.pkl
 *.rss
 *.rss.tmp
+*.mp3
+data/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
