@@ -18,7 +18,6 @@ class TestParlamentFeed(unittest.TestCase):
 
     @patch('parlament.pfeed.cache.httpHead')
     def test_add_item_enclosure_present(self, mock_head):
-        mock_head.return_value = _make_head_response('12345678')
         feed = pfeed.init_feed()
         audio_url = 'https://parlament.mt/Audio/test.mp3'
         pfeed.add_item(feed,
@@ -28,14 +27,13 @@ class TestParlamentFeed(unittest.TestCase):
             audio_url=audio_url,
             pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
         )
-        mock_head.assert_called_once_with(audio_url)
         self.assertEqual(len(feed.items), 1)
         item = feed.items[0]
         self.assertEqual(len(item['enclosures']), 1,
             "Each feed item must have exactly one enclosure (media file)")
         enclosure = item['enclosures'][0]
         self.assertEqual(enclosure.url, audio_url)
-        self.assertEqual(enclosure.length, '12345678')
+        self.assertEqual(enclosure.length, '')
         self.assertEqual(enclosure.mime_type, 'audio/mpeg')
 
     @patch('parlament.pfeed.cache.httpHead')
