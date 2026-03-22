@@ -18,7 +18,7 @@ def mirror_audio_to_r2(audio_url, s3_key):
 
     # If the object already exists, skip downloading and uploading entirely.
     if s3_object_exists(s3, s3_key):
-        print(f"S3 object {s3_key} already exists in {S3_BUCKET}; skipping mirror.")
+        print(f"S3 object {s3_key} already exists in bucket '{S3_BUCKET}'; skipping mirror.")
         return f"{R2_PARLAMENT_URL}/{s3_key}"
 
     # TODO: do not use temporary file; stream directly from source to S3
@@ -26,9 +26,9 @@ def mirror_audio_to_r2(audio_url, s3_key):
     response = cache.httpGetFile(audio_url, local_file)
     response.raise_for_status()
 
-    # TODO: log uploading
+    print(f"Uploading {s3_key} to bucket '{S3_BUCKET}'")
     s3.upload_file(local_file, S3_BUCKET, s3_key)
-    # TODO: log uploaded successfully
+    print(f"Uploaded {s3_key} to bucket '{S3_BUCKET}' successfully")
     # os.remove(local_file)
     return f"{R2_PARLAMENT_URL}/{s3_key}"
 

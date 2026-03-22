@@ -20,7 +20,6 @@ def run():
 
         # Mirror audio to R2 and use the R2 URL in the feed
         try:
-            # TODO: s3_key is probably redundant
             r2_url = mirror.mirror_audio_to_r2(audio_url, s3_key)
         except Exception as e:
             print(f"Error mirroring {audio_url} to R2: {e}", file=sys.stderr)
