@@ -13,13 +13,12 @@ _PLENARY_AUDIO_RE = re.compile(
 
 LEGISLATURE_ID = '506899'
 PARLAMENT_URL = 'https://parlament.mt'
-R2_PARLAMENT_URL = 'https://r2.parlament.podcast.mt'
 PARLAMENT_MEDIA_ARCHIVE_URL = PARLAMENT_URL + '/en/menues/reference-material/archives/media-archive/'
 PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/GetMediaForLegislature/?lang=mt&legislatureId=' + LEGISLATURE_ID
 BABEL_MT_DATETIME_FORMAT = "EEEE, d 'ta''' MMMM yyyy HH:mm"
 
 def get_leg():
-    cache.httpFetch(PARLAMENT_MEDIA_ARCHIVE_URL)
+    cache.httpGet(PARLAMENT_MEDIA_ARCHIVE_URL)
     response = cache.httpPost(PARLAMENT_MEDIA_ARCHIVE_API_URL, None, referer=PARLAMENT_MEDIA_ARCHIVE_URL)
     response.raise_for_status()
     return response.json()
@@ -38,14 +37,25 @@ def get_leg_number(leg):
 def get_plenary_sittings(leg):
     return [c for c in leg['Committees'] if c['CommitteeType'] == 'Plenary'][0]['Sittings']
 
-def get_sitting_audio_url(sitting):
+def get_bare_audio_url(sitting):
     audio_url = [m for m in sitting['Media'] if m['IsVideo'] == False]
     if len(audio_url) == 0:
         raise Exception('audio not found for sitting ' + get_sitting_number(sitting))
     else:
         audio_url = audio_url[0]['Url']
-        audio_url = correct_audio_url(sitting, audio_url)
-        return R2_PARLAMENT_URL + audio_url
+        return correct_audio_url(sitting, audio_url)
+
+def get_sitting_audio_url(sitting):
+        return PARLAMENT_URL + get_bare_audio_url(sitting)
+
+def get_audio_content_length(audio_url):
+    """Return the Content-Length header value for the given audio_url, or '' if unavailable."""
+    try:
+        response = cache.httpHead(audio_url)
+        return response.headers.get('content-length', '')
+    except Exception as e:
+        print(f'Warning: could not fetch Content-Length for {audio_url}: {e}')
+        return ''
 
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
@@ -114,7 +124,6 @@ def correct_audio_url(sitting, audio_url):
     except Exception as e:
         print('Warning: could not verify corrected URL: {} - keeping original'.format(e))
     return audio_url
-
 
 def get_episode_description(leg, sitting):
     text = '{leg_title} Seduta Nru: {episode:03} - {date}'

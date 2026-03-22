@@ -86,7 +86,7 @@ def httpHead(url):
         cache[key] = _to_cached(response)
         print('HEAD added to cache: {}'.format(url))
         return cache[key]
-
+    
 def httpGet(url, referer=None):
     key = ('GET', url)
     if key in cache:
@@ -104,6 +104,40 @@ def httpGet(url, referer=None):
         print('GET added to cache: {}'.format(url))
         write_cache()
         return cache[key]
+
+def httpGetFile(url, file_path, referer=None):
+    """
+    Download a file from url, store content in file_path, cache only metadata (status, headers, url, file_path).
+    If already cached, skip download and return cached metadata.
+    """
+    key = ('GETFILE', url, file_path)
+    if key in cache and Path(file_path).exists():
+        print(f'GETFILE from cache: {url} -> {file_path}')
+        meta = cache[key]
+        # Attach file_path as .file_path for convenience
+        meta.file_path = file_path
+        return meta
+    else:
+        headers = {
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+        if referer:
+            headers['Referer'] = referer
+        response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        meta = _CachedResponse(
+            response.status_code,
+            file_path,  # Instead of content, store file path
+            str(response.url),
+            {k.lower(): v for k, v in response.headers.items()},
+        )
+        meta.file_path = file_path
+        cache[key] = meta
+        print(f'GETFILE added to cache: {url} -> {file_path}')
+        write_cache()
+        return meta
 
 def httpPost(url, payload, referer=None):
     key = ('POST', payload, url)

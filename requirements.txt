@@ -3,3 +3,4 @@ feedgenerator
 babel
 lxml
 pytz
+boto3
