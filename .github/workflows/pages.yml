@@ -2,13 +2,8 @@ name: Deploy Pages
 
 on:
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: '0 0 * * *'
   workflow_dispatch:
-    inputs:
-      do_pages:
-        description: 'Set to "true" to deploy GitHub Pages'
-        required: false
-        default: 'true'
 
 permissions:
   pages: write
@@ -20,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       (github.event_name == 'schedule' && vars.DO_PAGES == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.do_pages == 'true')
+      (github.event_name == 'workflow_dispatch')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
