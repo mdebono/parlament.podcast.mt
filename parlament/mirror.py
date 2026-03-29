@@ -9,15 +9,16 @@ R2_PARLAMENT_URL = 'https://r2.parlament.podcast.mt'
 
 S3_BUCKET = os.environ["S3_BUCKET"]
 
+_s3 = boto3.client(
+    service_name="s3",
+    config=Config(signature_version="s3v4"),
+)
+
 def mirror_audio_to_r2(audio_url, s3_key):
-    s3 = boto3.client(
-        service_name="s3",
-        config=Config(signature_version="s3v4")
-    )
     s3_key = prep_s3_key(s3_key)
 
     # If the object already exists, skip downloading and uploading entirely.
-    if s3_object_exists(s3, s3_key):
+    if s3_object_exists(s3_key):
         print(f"S3 object {s3_key} already exists in bucket '{S3_BUCKET}'; skipping mirror.")
         return f"{R2_PARLAMENT_URL}/{s3_key}"
 
@@ -27,18 +28,21 @@ def mirror_audio_to_r2(audio_url, s3_key):
     response.raise_for_status()
 
     print(f"Uploading {s3_key} to bucket '{S3_BUCKET}'")
-    s3.upload_file(local_file, S3_BUCKET, s3_key)
+    try:
+        _s3.upload_file(local_file, S3_BUCKET, s3_key)
+    finally:
+        os.remove(local_file)
     print(f"Uploaded {s3_key} to bucket '{S3_BUCKET}' successfully")
-    # os.remove(local_file)
     return f"{R2_PARLAMENT_URL}/{s3_key}"
 
-def s3_object_exists(s3_client, key):
+def s3_object_exists(key):
     try:
-        s3_client.head_object(Bucket=S3_BUCKET, Key=key)
+        _s3.head_object(Bucket=S3_BUCKET, Key=key)
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
         if code in ("404", "NotFound", "NoSuchKey"):
             return False
+        raise
     return True
 
 def prep_s3_key(audio_url):

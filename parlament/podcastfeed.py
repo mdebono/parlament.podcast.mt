@@ -8,7 +8,7 @@ class PodcastFeed(Rss201rev2Feed):
     ns_url = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 
     def __init__(self, title, link, description, language=None, image_url=None, owner=None, author=None, category=None, **kwargs):
-        super().__init__(title, link, description, language, None, None, None, None, None, None, None, None, None, None, **kwargs)
+        super().__init__(title=title, link=link, description=description, language=language, **kwargs)
         self.feed['image_url'] = iri_to_uri(image_url)
         self.feed['owner'] = owner
         self.feed['author'] = author
@@ -32,3 +32,8 @@ class PodcastFeed(Rss201rev2Feed):
             handler.addQuickElement('itunes:author', self.feed['author'])
         if self.feed['category'] is not None:
             handler.addQuickElement('itunes:category', '', {'text': self.feed['category']})
+
+    def add_item_elements(self, handler, item):
+        super().add_item_elements(handler, item)
+        if item.get('duration') is not None:
+            handler.addQuickElement('itunes:duration', str(item['duration']))

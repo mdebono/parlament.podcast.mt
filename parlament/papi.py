@@ -35,7 +35,10 @@ def get_leg_number(leg):
     return leg['Number']
 
 def get_plenary_sittings(leg):
-    return [c for c in leg['Committees'] if c['CommitteeType'] == 'Plenary'][0]['Sittings']
+    plenary = [c for c in leg['Committees'] if c['CommitteeType'] == 'Plenary']
+    if not plenary:
+        raise ValueError('No plenary committee found in legislature data')
+    return plenary[0]['Sittings']
 
 def get_bare_audio_url(sitting):
     audio_url = [m for m in sitting['Media'] if m['IsVideo'] == False]

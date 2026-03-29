@@ -1,5 +1,3 @@
-from curl_cffi import requests
-
 from parlament import cache, papi, pfeed, mirror
 import sys
 import os
@@ -11,7 +9,11 @@ def run():
     feed = pfeed.init_feed()
     seen_urls = set()
     for sitting in list(reversed(sittings))[:20]:
-        s3_key = papi.get_bare_audio_url(sitting)
+        try:
+            s3_key = papi.get_bare_audio_url(sitting)
+        except Exception as e:
+            print(f"Warning: skipping sitting {papi.get_sitting_number(sitting)}: {e}", file=sys.stderr)
+            continue
         if s3_key in seen_urls:
             print(f"WARNING: Duplicate URL for sitting {papi.get_sitting_number(sitting)}: {s3_key}", file=sys.stderr)
         seen_urls.add(s3_key)
