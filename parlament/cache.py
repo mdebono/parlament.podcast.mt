@@ -90,13 +90,6 @@ def write_cache():
         pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
         print('cache written')
 
-def httpFetch(url):
-    """Fetch an HTML page without caching, used to establish session cookies."""
-    print('Fetching (no cache): {}'.format(url))
-    response = _session.get(url, timeout=HTTP_TIMEOUT)
-    if not response.ok:
-        print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
-
 def httpHead(url):
     key = ('HEAD', url)
     if key in cache:

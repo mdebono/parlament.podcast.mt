@@ -1,6 +1,5 @@
-from parlament import cache, papi, pfeed, mirror
+from parlament import papi, pfeed, mirror
 import sys
-import os
 
 def run():
     leg = papi.get_leg()
@@ -16,9 +15,10 @@ def run():
             continue
         if s3_key in seen_urls:
             print(f"WARNING: Duplicate URL for sitting {papi.get_sitting_number(sitting)}: {s3_key}", file=sys.stderr)
+            continue
         seen_urls.add(s3_key)
 
-        audio_url = papi.get_sitting_audio_url(sitting)
+        audio_url = papi.PARLAMENT_URL + s3_key
 
         # Mirror audio to R2 and use the R2 URL in the feed
         try:

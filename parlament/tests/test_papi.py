@@ -118,5 +118,42 @@ class TestCorrectAudioUrl(unittest.TestCase):
         mock_head.assert_not_called()
 
 
+class TestGetPlenarySittings(unittest.TestCase):
+
+    def test_no_plenary_committee_raises(self):
+        leg = {'Committees': [{'CommitteeType': 'Budget', 'Sittings': []}]}
+        with self.assertRaises(ValueError, msg='Expected ValueError when no plenary committee exists'):
+            papi.get_plenary_sittings(leg)
+
+    def test_returns_sittings_for_plenary(self):
+        sittings = [_make_sitting(1, '2023-01-01T10:00:00')]
+        leg = {'Committees': [{'CommitteeType': 'Plenary', 'Sittings': sittings}]}
+        result = papi.get_plenary_sittings(leg)
+        self.assertEqual(result, sittings)
+
+
+class TestGetBareAudioUrl(unittest.TestCase):
+
+    def test_no_audio_raises(self):
+        sitting = _make_sitting(5, '2023-01-01T10:00:00')
+        # Media list is already [] in _make_sitting
+        with self.assertRaises(Exception, msg='Expected Exception when sitting has no audio media'):
+            papi.get_bare_audio_url(sitting)
+
+    def test_video_only_raises(self):
+        sitting = _make_sitting(5, '2023-01-01T10:00:00')
+        sitting['Media'] = [{'IsVideo': True, 'Url': '/Audio/video.mp4'}]
+        with self.assertRaises(Exception):
+            papi.get_bare_audio_url(sitting)
+
+    @patch('parlament.papi.cache.httpHead')
+    def test_returns_audio_url(self, mock_head):
+        sitting = _make_sitting(171, '2023-11-14T16:00:00')
+        url = '/Audio/14thLeg/Plenary/Plenary%20171%2014-11-2023%201600hrs.mp3'
+        sitting['Media'] = [{'IsVideo': False, 'Url': url}]
+        result = papi.get_bare_audio_url(sitting)
+        self.assertEqual(result, url)
+
+
 if __name__ == '__main__':
     unittest.main()
