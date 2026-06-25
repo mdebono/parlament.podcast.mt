@@ -51,6 +51,29 @@ def _to_cached(response):
         {k.lower(): v for k, v in response.headers.items()},
     )
 
+
+class _FileDownloadMeta:
+    """Picklable metadata for a file downloaded via httpGetFile.
+
+    Kept separate from _CachedResponse so the two types cannot be mistaken:
+    _CachedResponse.content is bytes; _FileDownloadMeta.file_path is a str.
+    """
+    def __init__(self, status_code, file_path, url, headers=None):
+        self.status_code = status_code
+        self.file_path = file_path
+        self.url = url
+        self.headers = headers or {}
+
+    def raise_for_status(self):
+        if 400 <= self.status_code < 500:
+            raise requests.exceptions.HTTPError(
+                '{} Client Error for url: {}'.format(self.status_code, self.url)
+            )
+        elif 500 <= self.status_code < 600:
+            raise requests.exceptions.HTTPError(
+                '{} Server Error for url: {}'.format(self.status_code, self.url)
+            )
+
 def read_cache():
     print('reading cache')
     if Path(CACHE_PATH).exists():
@@ -66,13 +89,6 @@ def write_cache():
     with open(CACHE_PATH, 'wb') as f:
         pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
         print('cache written')
-
-def httpFetch(url):
-    """Fetch an HTML page without caching, used to establish session cookies."""
-    print('Fetching (no cache): {}'.format(url))
-    response = _session.get(url, timeout=HTTP_TIMEOUT)
-    if not response.ok:
-        print('Warning: page fetch returned HTTP {}: {}'.format(response.status_code, url))
 
 def httpHead(url):
     key = ('HEAD', url)
@@ -113,10 +129,7 @@ def httpGetFile(url, file_path, referer=None):
     key = ('GETFILE', url, file_path)
     if key in cache and Path(file_path).exists():
         print(f'GETFILE from cache: {url} -> {file_path}')
-        meta = cache[key]
-        # Attach file_path as .file_path for convenience
-        meta.file_path = file_path
-        return meta
+        return cache[key]
     else:
         headers = {
             'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -127,13 +140,12 @@ def httpGetFile(url, file_path, referer=None):
         response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         with open(file_path, 'wb') as f:
             f.write(response.content)
-        meta = _CachedResponse(
+        meta = _FileDownloadMeta(
             response.status_code,
-            file_path,  # Instead of content, store file path
+            file_path,
             str(response.url),
             {k.lower(): v for k, v in response.headers.items()},
         )
-        meta.file_path = file_path
         cache[key] = meta
         print(f'GETFILE added to cache: {url} -> {file_path}')
         write_cache()

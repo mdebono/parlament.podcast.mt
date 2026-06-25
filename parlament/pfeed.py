@@ -1,11 +1,10 @@
 # Parlament Podcast Feed
 
 from parlament.podcastfeed import PodcastFeed
-from parlament import cache
-from curl_cffi import requests
 from feedgenerator import Enclosure
 
 from lxml import etree
+import os
 
 UTF8 = 'utf8'
 
@@ -34,7 +33,11 @@ def add_item(feed, title, description, link, audio_url, content_length='', durat
 
 def write_feed(feed, filename):
     tmp_filename = filename + '.tmp'
-    with open(tmp_filename, 'w', encoding=UTF8) as fp:
-        feed.write(fp, UTF8)
-    tree = etree.parse(tmp_filename)
-    tree.write(filename, encoding=UTF8, pretty_print=True)
+    try:
+        with open(tmp_filename, 'w', encoding=UTF8) as fp:
+            feed.write(fp, UTF8)
+        tree = etree.parse(tmp_filename)
+        tree.write(filename, encoding=UTF8, pretty_print=True)
+    finally:
+        if os.path.exists(tmp_filename):
+            os.remove(tmp_filename)

@@ -35,18 +35,21 @@ def get_leg_number(leg):
     return leg['Number']
 
 def get_plenary_sittings(leg):
-    return [c for c in leg['Committees'] if c['CommitteeType'] == 'Plenary'][0]['Sittings']
+    plenary = [c for c in leg['Committees'] if c['CommitteeType'] == 'Plenary']
+    if not plenary:
+        raise ValueError('No plenary committee found in legislature data')
+    return plenary[0]['Sittings']
 
 def get_bare_audio_url(sitting):
-    audio_url = [m for m in sitting['Media'] if m['IsVideo'] == False]
+    audio_url = [m for m in sitting['Media'] if not m['IsVideo']]
     if len(audio_url) == 0:
-        raise Exception('audio not found for sitting ' + get_sitting_number(sitting))
+        raise Exception('audio not found for sitting ' + str(get_sitting_number(sitting)))
     else:
         audio_url = audio_url[0]['Url']
         return correct_audio_url(sitting, audio_url)
 
 def get_sitting_audio_url(sitting):
-        return PARLAMENT_URL + get_bare_audio_url(sitting)
+    return PARLAMENT_URL + get_bare_audio_url(sitting)
 
 def get_audio_content_length(audio_url):
     """Return the Content-Length header value for the given audio_url, or '' if unavailable."""
