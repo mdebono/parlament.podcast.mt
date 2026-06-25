@@ -11,7 +11,7 @@ _PLENARY_AUDIO_RE = re.compile(
     re.IGNORECASE,
 )
 
-LEGISLATURE_ID = '506899'
+LEGISLATURE_ID = '541382'
 PARLAMENT_URL = 'https://parlament.mt'
 PARLAMENT_MEDIA_ARCHIVE_URL = PARLAMENT_URL + '/en/menues/reference-material/archives/media-archive/'
 PARLAMENT_MEDIA_ARCHIVE_API_URL = PARLAMENT_URL + '/umbraco/Api/MediaArchiveApi/GetMediaForLegislature/?lang=mt&legislatureId=' + LEGISLATURE_ID
