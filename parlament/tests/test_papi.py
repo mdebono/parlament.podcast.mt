@@ -10,7 +10,7 @@ from parlament import papi
 
 
 # Use only the path, not the domain, to match how correct_audio_url constructs new_url
-_BASE = '/Audio/14thLeg/Plenary/'
+_BASE = '/Audio/15thLeg/Plenary/'
 _WRONG_URL = _BASE + 'Plenary%20172%2015-11-2023%200900hrs.mp3'   # episode 172
 _RIGHT_URL  = _BASE + 'Plenary%20171%2014-11-2023%201600hrs.mp3'  # episode 171
 
@@ -149,7 +149,7 @@ class TestGetBareAudioUrl(unittest.TestCase):
     @patch('parlament.papi.cache.httpHead')
     def test_returns_audio_url(self, mock_head):
         sitting = _make_sitting(171, '2023-11-14T16:00:00')
-        url = '/Audio/14thLeg/Plenary/Plenary%20171%2014-11-2023%201600hrs.mp3'
+        url = '/Audio/15thLeg/Plenary/Plenary%20171%2014-11-2023%201600hrs.mp3'
         sitting['Media'] = [{'IsVideo': False, 'Url': url}]
         result = papi.get_bare_audio_url(sitting)
         self.assertEqual(result, url)
