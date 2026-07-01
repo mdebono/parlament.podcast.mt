@@ -132,6 +132,102 @@ class TestGetPlenarySittings(unittest.TestCase):
         self.assertEqual(result, sittings)
 
 
+_AGENDA_HTML = b'''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+  <div class="row"><div class="col-md-12 container">
+    <p style="font-weight:bold">MOZZJONIJIET</p>
+    <table class="table table-striped">
+      <tr><td><a href="/mt/15th-leg/motions/motion-no-015/">Mozzjoni Nru 15 - Xi Haga</a></td></tr>
+    </table>
+    <p style="font-weight:bold">ORDNIJIET TAL-\xc4\xa0URNATA</p>
+    <table class="table table-striped">
+      <tr><td><div><p>Indirizz b'risposta</p></div></td></tr>
+      <tr><td><a href="/mt/15th-leg/bills/bill-005/">Abbozz Nru  5 - Xi Haga
+
+ -  L-Ewwel Qari
+      </a><br /></td></tr>
+    </table>
+  </div></div>
+</div>
+</body></html>
+'''
+
+_NO_AGENDA_HTML = b'<html><body><div class="panel-body">no orders here</div></body></html>'
+
+
+class TestParseAgendaHtml(unittest.TestCase):
+
+    def test_parses_headings_and_items(self):
+        agenda = papi.parse_agenda_html(_AGENDA_HTML)
+        self.assertEqual(agenda,
+            'MOZZJONIJIET\n'
+            '- Mozzjoni Nru 15 - Xi Haga\n'
+            'ORDNIJIET TAL-ĠURNATA\n'
+            "- Indirizz b'risposta\n"
+            '- Abbozz Nru 5 - Xi Haga - L-Ewwel Qari')
+
+    def test_no_orders_div_returns_none(self):
+        self.assertIsNone(papi.parse_agenda_html(_NO_AGENDA_HTML))
+
+    def test_empty_orders_div_returns_none(self):
+        self.assertIsNone(papi.parse_agenda_html(b'<html><body><div id="orders"></div></body></html>'))
+
+
+class TestGetSittingUrlMt(unittest.TestCase):
+
+    def test_language_neutral_url_gets_mt_prefix(self):
+        sitting = {'Url': '/15th-leg/plenary-session/ps-001/'}
+        self.assertEqual(papi.get_sitting_url_mt(sitting),
+                         papi.PARLAMENT_URL + '/mt/15th-leg/plenary-session/ps-001/')
+
+    def test_en_url_is_switched_to_mt(self):
+        sitting = {'Url': '/en/15th-leg/plenary-session/ps-001/'}
+        self.assertEqual(papi.get_sitting_url_mt(sitting),
+                         papi.PARLAMENT_URL + '/mt/15th-leg/plenary-session/ps-001/')
+
+    def test_mt_url_is_unchanged(self):
+        sitting = {'Url': '/mt/15th-leg/plenary-session/ps-001/'}
+        self.assertEqual(papi.get_sitting_url_mt(sitting),
+                         papi.PARLAMENT_URL + '/mt/15th-leg/plenary-session/ps-001/')
+
+
+def _page_response(content, status_code=200):
+    r = MagicMock()
+    r.status_code = status_code
+    r.content = content
+    r.raise_for_status = MagicMock()
+    return r
+
+
+class TestGetEpisodeDescription(unittest.TestCase):
+
+    _LEG = {'TitleMT': 'Il-Hmistax-il Legislatura', 'Number': 15}
+
+    def _sitting(self):
+        return _make_sitting(1, '2025-06-30T16:00:00')
+
+    @patch('parlament.papi.cache.httpGet', return_value=_page_response(_AGENDA_HTML))
+    def test_description_includes_agenda(self, mock_get):
+        description = papi.get_episode_description(self._LEG, self._sitting())
+        self.assertIn('Il-Hmistax-il Legislatura Seduta Nru: 001', description)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n', description)
+        self.assertIn('- Mozzjoni Nru 15 - Xi Haga', description)
+        mock_get.assert_called_once_with(papi.PARLAMENT_URL + '/mt/test', referer=papi.PARLAMENT_URL)
+
+    @patch('parlament.papi.cache.httpGet', return_value=_page_response(_NO_AGENDA_HTML))
+    def test_description_without_agenda_unchanged(self, mock_get):
+        description = papi.get_episode_description(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', description)
+        self.assertTrue(description.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+
+    @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
+    def test_description_survives_fetch_failure(self, mock_get):
+        description = papi.get_episode_description(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', description)
+        self.assertIn('Seduta Nru: 001', description)
+
+
 class TestGetBareAudioUrl(unittest.TestCase):
 
     def test_no_audio_raises(self):
