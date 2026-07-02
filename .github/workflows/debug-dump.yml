@@ -1,0 +1,51 @@
+name: Debug Dump Agenda HTML
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Dump sitting pages
+        run: |
+          python - <<'EOF'
+          import sys, os
+          sys.path.insert(0, '.')
+          from parlament import papi, cache
+
+          leg = papi.get_leg()
+          sittings = papi.get_plenary_sittings(leg)
+          os.makedirs('debug_html', exist_ok=True)
+          for sitting in list(reversed(sittings))[:6]:
+              n = papi.get_sitting_number(sitting)
+              url = papi.get_sitting_url_mt(sitting)
+              try:
+                  r = cache.httpGet(url, referer=papi.PARLAMENT_URL)
+                  path = f'debug_html/sitting-{n:03}.html'
+                  with open(path, 'wb') as f:
+                      f.write(r.content)
+                  print(f'sitting {n}: status {r.status_code} -> {path} ({len(r.content)} bytes)')
+              except Exception as e:
+                  print(f'sitting {n}: ERROR {e}')
+          EOF
+
+      - name: Upload debug HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html
+          path: debug_html
+          retention-days: 1
