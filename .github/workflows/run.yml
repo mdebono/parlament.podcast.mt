@@ -39,3 +39,33 @@ jobs:
         with:
           name: podcast-rss
           path: podcast.rss
+
+      - name: TEMP - Dump raw sitting page HTML for debugging
+        run: |
+          python - <<'EOF'
+          import sys, os
+          sys.path.insert(0, '.')
+          from parlament import papi, cache
+
+          leg = papi.get_leg()
+          sittings = papi.get_plenary_sittings(leg)
+          os.makedirs('debug_html', exist_ok=True)
+          for sitting in list(reversed(sittings))[:6]:
+              n = papi.get_sitting_number(sitting)
+              url = papi.get_sitting_url_mt(sitting)
+              try:
+                  r = cache.httpGet(url, referer=papi.PARLAMENT_URL)
+                  path = f'debug_html/sitting-{n:03}.html'
+                  with open(path, 'wb') as f:
+                      f.write(r.content)
+                  print(f'sitting {n}: status {r.status_code} -> {path} ({len(r.content)} bytes)')
+              except Exception as e:
+                  print(f'sitting {n}: ERROR {e}')
+          EOF
+
+      - name: TEMP - Upload debug HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html
+          path: debug_html
+          retention-days: 1
