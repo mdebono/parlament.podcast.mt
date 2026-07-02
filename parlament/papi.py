@@ -3,6 +3,7 @@
 from datetime import datetime
 import re
 import pytz, babel.dates
+import lxml.html
 
 from parlament import cache
 
@@ -62,6 +63,19 @@ def get_audio_content_length(audio_url):
 
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
+
+def get_sitting_url_mt(sitting):
+    """Return the Maltese-language URL of the sitting page.
+
+    The API returns language-neutral paths (e.g. /15th-leg/plenary-session/...)
+    which the site renders in English by default; the Maltese version lives
+    under the /mt/ prefix."""
+    url = sitting['Url']
+    if url.startswith('/en/'):
+        url = url[3:]
+    if not url.startswith('/mt/'):
+        url = '/mt' + url
+    return PARLAMENT_URL + url
 
 def get_sitting_title(sitting):
     return sitting['Title']
@@ -128,11 +142,52 @@ def correct_audio_url(sitting, audio_url):
         print('Warning: could not verify corrected URL: {} - keeping original'.format(e))
     return audio_url
 
+def parse_agenda_html(html):
+    """Extract the agenda from a sitting page as plain-text lines, or None.
+
+    The sitting page renders the agenda inside <div id="orders">: bold <p>
+    elements are section headings (e.g. ORDNIJIET TAL-ĠURNATA) and each table
+    row is one agenda item."""
+    doc = lxml.html.fromstring(html)
+    orders = doc.xpath('//div[@id="orders"]')
+    if not orders:
+        return None
+    lines = []
+    for el in orders[0].iter():
+        if (el.tag == 'p' and 'bold' in (el.get('style') or '')
+                and not any(a.tag == 'table' for a in el.iterancestors())):
+            text = ' '.join(el.text_content().split())
+            if text:
+                lines.append(text)
+        elif el.tag == 'tr':
+            text = ' '.join(el.text_content().split())
+            if text:
+                lines.append('- ' + text)
+    if not lines:
+        return None
+    return '\n'.join(lines)
+
+def get_sitting_agenda(sitting):
+    """Fetch the sitting page and return its agenda as plain text, or None if
+    the page or the agenda section is unavailable."""
+    url = get_sitting_url_mt(sitting)
+    try:
+        response = cache.httpGet(url, referer=PARLAMENT_URL)
+        response.raise_for_status()
+        return parse_agenda_html(response.content)
+    except Exception as e:
+        print('Warning: could not fetch agenda for sitting {}: {}'.format(get_sitting_number(sitting), e))
+        return None
+
 def get_episode_description(leg, sitting):
     text = '{leg_title} Seduta Nru: {episode:03} - {date}'
     date = get_sitting_date(sitting)
-    return text.format(
+    description = text.format(
         leg_title = get_leg_title(leg),
         episode = get_sitting_number(sitting),
         date = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt'),
     )
+    agenda = get_sitting_agenda(sitting)
+    if agenda:
+        description += '\n\nAġenda:\n' + agenda
+    return description
