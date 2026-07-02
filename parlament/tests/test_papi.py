@@ -155,6 +155,27 @@ _AGENDA_HTML = b'''
 
 _NO_AGENDA_HTML = b'<html><body><div class="panel-body">no orders here</div></body></html>'
 
+# Mirrors the opening/constitutive sitting, which packs several ceremonial
+# steps into a single <tr> using <p> and <br> instead of separate rows: one
+# mid-sentence <br> wrap (no punctuation before the break) that must be
+# rejoined, and several <br>-separated sentences that must stay separate.
+_PACKED_ROW_HTML = b'''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+  <div class="row"><div class="col-md-12 container">
+    <p style="font-weight:bold">ORDNIJIET TAL-\xc4\xa0URNATA</p>
+    <table class="table table-striped">
+      <tr><td><div>
+        <p>Bidu tas-Seduta Parlamentari.</p>
+        <p>L-Iskrivan taqra r-ri\xc5\xbcultati u<br>l-ismijiet tal-Membri eletti.</p>
+        <p>Elezzjoni ta' Deputy Speaker.<br>L-Onorevoli Membri jie\xc4\xa7du l-\xc4\xa0urament.<br>Il-Kamra ti\xc4\xa1i a\xc4\xa1\xc4\xa1ornata.</p>
+      </div></td></tr>
+    </table>
+  </div></div>
+</div>
+</body></html>
+'''
+
 
 class TestParseAgendaHtml(unittest.TestCase):
 
@@ -172,6 +193,16 @@ class TestParseAgendaHtml(unittest.TestCase):
 
     def test_empty_orders_div_returns_none(self):
         self.assertIsNone(papi.parse_agenda_html(b'<html><body><div id="orders"></div></body></html>'))
+
+    def test_packed_row_splits_into_separate_steps(self):
+        agenda = papi.parse_agenda_html(_PACKED_ROW_HTML)
+        self.assertEqual(agenda,
+            'ORDNIJIET TAL-ĠURNATA\n'
+            '- Bidu tas-Seduta Parlamentari.\n'
+            '- L-Iskrivan taqra r-riżultati u l-ismijiet tal-Membri eletti.\n'
+            "- Elezzjoni ta' Deputy Speaker.\n"
+            "- L-Onorevoli Membri jieħdu l-Ġurament.\n"
+            '- Il-Kamra tiġi aġġornata.')
 
 
 class TestGetSittingUrlMt(unittest.TestCase):

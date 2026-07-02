@@ -142,12 +142,53 @@ def correct_audio_url(sitting, audio_url):
         print('Warning: could not verify corrected URL: {} - keeping original'.format(e))
     return audio_url
 
+_SENTENCE_END_RE = re.compile(r'[.!?:]\s*$')
+
+def _split_row_into_lines(el):
+    """Split a <tr>'s content into text lines, breaking at <p> and <br>
+    boundaries. Most rows are a single line, but some (e.g. the opening
+    sitting's ceremonial programme) pack many agenda steps into one cell
+    using <p>/<br> instead of separate rows. A <br>/<p> boundary only starts
+    a new line if the text so far ends in sentence-final punctuation;
+    otherwise it's treated as a mid-sentence wrap and merged with what
+    follows, since the source HTML uses <br> for both purposes."""
+    lines = []
+    buf = []
+
+    def flush():
+        text = ' '.join(''.join(buf).split())
+        buf.clear()
+        if not text:
+            return
+        if lines and not _SENTENCE_END_RE.search(lines[-1]):
+            lines[-1] = lines[-1] + ' ' + text
+        else:
+            lines.append(text)
+
+    def walk(node):
+        if node.text:
+            buf.append(node.text)
+        for child in node:
+            if child.tag in ('br', 'p'):
+                flush()
+                if child.tag == 'p':
+                    walk(child)
+                    flush()
+            else:
+                walk(child)
+            if child.tail:
+                buf.append(child.tail)
+
+    walk(el)
+    flush()
+    return lines
+
 def parse_agenda_html(html):
     """Extract the agenda from a sitting page as plain-text lines, or None.
 
     The sitting page renders the agenda inside <div id="orders">: bold <p>
     elements are section headings (e.g. ORDNIJIET TAL-ĠURNATA) and each table
-    row is one agenda item."""
+    row is one or more agenda items."""
     doc = lxml.html.fromstring(html)
     orders = doc.xpath('//div[@id="orders"]')
     if not orders:
@@ -160,9 +201,8 @@ def parse_agenda_html(html):
             if text:
                 lines.append(text)
         elif el.tag == 'tr':
-            text = ' '.join(el.text_content().split())
-            if text:
-                lines.append('- ' + text)
+            for line in _split_row_into_lines(el):
+                lines.append('- ' + line)
     if not lines:
         return None
     return '\n'.join(lines)
