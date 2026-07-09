@@ -1,14 +1,11 @@
 import atexit
 import json as _json
 import pickle
-import time
 from pathlib import Path
 from curl_cffi import requests
 
 CACHE_PATH = 'cache.pkl'
 HTTP_TIMEOUT = 30  # seconds
-RETRY_STATUS_CODES = {403, 429, 500, 502, 503, 504}
-RETRY_BACKOFF_SECONDS = (1, 2)  # delays before the 2nd and 3rd attempts
 
 # Session that impersonates Chrome at the TLS and HTTP level.
 # Parliament.mt uses WAF/bot detection based on TLS fingerprinting (JA3): a
@@ -119,13 +116,6 @@ def httpGet(url, referer=None):
         if referer:
             headers['Referer'] = referer
         response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
-        for delay in RETRY_BACKOFF_SECONDS:
-            if response.status_code not in RETRY_STATUS_CODES:
-                break
-            print('Warning: GET {} returned HTTP {}, retrying in {}s'.format(
-                url, response.status_code, delay))
-            time.sleep(delay)
-            response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         cache[key] = _to_cached(response)
         print('GET added to cache: {}'.format(url))
         write_cache()
