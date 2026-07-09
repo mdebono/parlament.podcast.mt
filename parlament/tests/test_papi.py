@@ -132,7 +132,7 @@ class TestGetPlenarySittings(unittest.TestCase):
         self.assertEqual(result, sittings)
 
 
-_AGENDA_HTML = b'''
+_AGENDA_HTML = '''
 <html><head><meta charset="utf-8" /></head><body>
 <div class="panel-body" id="orders">
   <div class="row"><div class="col-md-12 container">
@@ -140,7 +140,7 @@ _AGENDA_HTML = b'''
     <table class="table table-striped">
       <tr><td><a href="/mt/15th-leg/motions/motion-no-015/">Mozzjoni Nru 15 - Xi Haga</a></td></tr>
     </table>
-    <p style="font-weight:bold">ORDNIJIET TAL-\xc4\xa0URNATA</p>
+    <p style="font-weight:bold">ORDNIJIET TAL-ĠURNATA</p>
     <table class="table table-striped">
       <tr><td><div><p>Indirizz b'risposta</p></div></td></tr>
       <tr><td><a href="/mt/15th-leg/bills/bill-005/">Abbozz Nru  5 - Xi Haga
@@ -151,7 +151,7 @@ _AGENDA_HTML = b'''
   </div></div>
 </div>
 </body></html>
-'''
+'''.encode('utf-8')
 
 _NO_AGENDA_HTML = b'<html><body><div class="panel-body">no orders here</div></body></html>'
 
@@ -159,22 +159,22 @@ _NO_AGENDA_HTML = b'<html><body><div class="panel-body">no orders here</div></bo
 # steps into a single <tr> using <p> and <br> instead of separate rows: one
 # mid-sentence <br> wrap (no punctuation before the break) that must be
 # rejoined, and several <br>-separated sentences that must stay separate.
-_PACKED_ROW_HTML = b'''
+_PACKED_ROW_HTML = '''
 <html><head><meta charset="utf-8" /></head><body>
 <div class="panel-body" id="orders">
   <div class="row"><div class="col-md-12 container">
-    <p style="font-weight:bold">ORDNIJIET TAL-\xc4\xa0URNATA</p>
+    <p style="font-weight:bold">ORDNIJIET TAL-ĠURNATA</p>
     <table class="table table-striped">
       <tr><td><div>
         <p>Bidu tas-Seduta Parlamentari.</p>
-        <p>L-Iskrivan taqra r-ri\xc5\xbcultati u<br>l-ismijiet tal-Membri eletti.</p>
-        <p>Elezzjoni ta' Deputy Speaker.<br>L-Onorevoli Membri jie\xc4\xa7du l-\xc4\xa0urament.<br>Il-Kamra ti\xc4\xa1i a\xc4\xa1\xc4\xa1ornata.</p>
+        <p>L-Iskrivan taqra r-riżultati u<br>l-ismijiet tal-Membri eletti.</p>
+        <p>Elezzjoni ta' Deputy Speaker.<br>L-Onorevoli Membri jieħdu l-Ġurament.<br>Il-Kamra tiġi aġġornata.</p>
       </div></td></tr>
     </table>
   </div></div>
 </div>
 </body></html>
-'''
+'''.encode('utf-8')
 
 
 class TestParseAgendaHtml(unittest.TestCase):
