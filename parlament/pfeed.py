@@ -20,7 +20,7 @@ def init_feed():
         category="News & Politics",
     )
 
-def add_item(feed, title, description, link, audio_url, content_length='', duration=None, pubdate=None, unique_id=None):
+def add_item(feed, title, description, link, audio_url, content_length='', duration=None, pubdate=None, unique_id=None, summary=None):
     feed.add_item(
         title=title,
         description=description,
@@ -29,6 +29,7 @@ def add_item(feed, title, description, link, audio_url, content_length='', durat
         unique_id=unique_id or audio_url,
         duration=duration,
         pubdate=pubdate,
+        summary=summary,
     )
 
 def write_feed(feed, filename):

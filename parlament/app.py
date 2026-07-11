@@ -12,8 +12,9 @@ from parlament import papi, latest, pfeed, mirror, catalog
 #   link               absolute URL of the sitting/meeting page
 #   pubdate            aware datetime
 #   source             'media-archive' | 'latest-media'
-#   build_description  zero-arg callable; only invoked for new episodes so
-#                      agenda pages are not re-fetched on every run
+#   build_texts        zero-arg callable returning (description, summary);
+#                      only invoked for new episodes so agenda pages are
+#                      not re-fetched on every run
 
 ARCHIVE_SITTING_LIMIT = 20
 
@@ -65,8 +66,8 @@ def ingest(store, candidates):
             print(f'Error mirroring {audio_url} to R2: {e}', file=sys.stderr)
             continue
         content_length = mirror.get_r2_content_length(key)
-        description = candidate['build_description']()
-        entry = catalog.make_entry(candidate, r2_url, content_length, description)
+        description, summary = candidate['build_texts']()
+        entry = catalog.make_entry(candidate, r2_url, content_length, description, summary)
         catalog.add_episode(store, key, entry)
 
 _KIND_LABELS = {'plenary': 'Seduta', 'committee': 'Laqgħa'}
@@ -89,26 +90,30 @@ def archive_sitting_index(leg):
     return index
 
 def backfill_descriptions(store, leg):
-    """Rebuild the description of every catalogued episode the archive can
-    still account for, using the current formatting logic. Guid, title,
-    link, pubdate, kind and sources are never touched - only the
-    description is refreshed. Entries the archive has no equivalent for
-    (kind='event', or a committee meeting it no longer carries) are left
-    untouched."""
+    """Rebuild the description/summary of every catalogued episode the
+    archive can still account for, using the current formatting logic.
+    Guid, title, link, pubdate, kind and sources are never touched - only
+    these two text fields are refreshed. Entries the archive has no
+    equivalent for (kind='event', or a committee meeting it no longer
+    carries) are left untouched."""
     index = archive_sitting_index(leg)
     for key, entry in store['episodes'].items():
         label = _KIND_LABELS.get(entry['kind'])
         sitting = index.get(key)
         if label is None or sitting is None:
             continue
-        description = papi.build_sitting_description(
+        # Plenary's canonical subject is the legislature's own title (as
+        # the live path uses via get_episode_texts); committees use their
+        # own sitting title, same as the live widget path.
+        title = papi.get_leg_title(leg) if entry['kind'] == 'plenary' else papi.get_sitting_title(sitting)
+        description, summary = papi.build_sitting_texts(
             label,
-            papi.get_sitting_title(sitting),
+            title,
             papi.get_sitting_number(sitting),
             papi.get_sitting_date(sitting),
-            papi.get_sitting_agenda(sitting),
+            papi.get_sitting_agenda_lines(sitting),
         )
-        catalog.update_description(entry, description)
+        catalog.update_texts(entry, description, summary)
 
 def build_feed(store):
     feed = pfeed.init_feed()
@@ -121,6 +126,7 @@ def build_feed(store):
             content_length=entry['content_length'],
             pubdate=datetime.fromisoformat(entry['pubdate']),
             unique_id=entry['guid'],
+            summary=entry.get('summary'),
         )
     return feed
 

@@ -228,37 +228,44 @@ class TestGetCandidates(unittest.TestCase):
         self.assertEqual(latest.get_candidates(_LEG, [meeting]), [])
 
 
-class TestBuildDescription(unittest.TestCase):
+_AGENDA_LINES = [('heading', 'PUNT'), ('item', 'Xi ħaġa')]
 
-    @patch('parlament.papi.get_agenda_by_url', return_value='PUNT\n- Xi ħaġa')
-    def test_committee_description_with_agenda(self, mock_agenda):
+
+class TestBuildTexts(unittest.TestCase):
+
+    @patch('parlament.papi.get_agenda_lines_by_url', return_value=_AGENDA_LINES)
+    def test_committee_texts_with_agenda(self, mock_agenda):
         [candidate] = latest.get_candidates(_LEG, [_make_meeting()])
-        description = candidate['build_description']()
-        self.assertTrue(description.startswith(
+        html, summary = candidate['build_texts']()
+        self.assertTrue(summary.startswith(
             'Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012 - '))
-        self.assertIn('\n\nAġenda:\nPUNT\n- Xi ħaġa', description)
+        self.assertIn('\n\nAġenda:\nPUNT\n- Xi ħaġa', summary)
+        self.assertIn('<p><strong>Aġenda:</strong></p><p><strong>PUNT</strong></p><ul><li>Xi ħaġa</li></ul>', html)
         mock_agenda.assert_called_once_with(
             papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
 
-    @patch('parlament.papi.get_agenda_by_url', return_value=None)
-    def test_committee_description_without_agenda(self, mock_agenda):
+    @patch('parlament.papi.get_agenda_lines_by_url', return_value=None)
+    def test_committee_texts_without_agenda(self, mock_agenda):
         [candidate] = latest.get_candidates(_LEG, [_make_meeting()])
-        description = candidate['build_description']()
-        self.assertNotIn('Aġenda', description)
+        html, summary = candidate['build_texts']()
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
 
-    @patch('parlament.papi.get_agenda_by_url')
-    def test_event_description_never_fetches_agenda(self, mock_agenda):
+    @patch('parlament.papi.get_agenda_lines_by_url')
+    def test_event_texts_never_fetch_agenda(self, mock_agenda):
         [candidate] = latest.get_candidates(_LEG, [_make_event()])
-        description = candidate['build_description']()
-        self.assertTrue(description.startswith('Konferenza dwar X - '))
+        html, summary = candidate['build_texts']()
+        self.assertTrue(summary.startswith('Konferenza dwar X - '))
+        self.assertEqual(html, '<p>' + summary + '</p>')
         mock_agenda.assert_not_called()
 
-    @patch('parlament.papi.get_agenda_by_url', return_value=None)
-    def test_plenary_description_matches_archive_format(self, mock_agenda):
+    @patch('parlament.papi.get_agenda_lines_by_url', return_value=None)
+    def test_plenary_texts_match_archive_format(self, mock_agenda):
         [candidate] = latest.get_candidates(_LEG, [_make_plenary()])
-        description = candidate['build_description']()
-        self.assertTrue(description.startswith(
+        html, summary = candidate['build_texts']()
+        self.assertTrue(summary.startswith(
             'Il-Ħmistax-il Leġiżlatura Seduta Nru: 171 - '))
+        self.assertEqual(html, '<p>' + summary + '</p>')
 
 
 if __name__ == '__main__':

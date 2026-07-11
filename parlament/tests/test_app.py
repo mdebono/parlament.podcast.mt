@@ -101,6 +101,8 @@ _COMMITTEE_AGENDA_HTML = (
     b'</div></body></html>'
 )
 
+_ITUNES_NS = '{http://www.itunes.com/dtds/podcast-1.0.dtd}'
+
 def _read_feed_items(path='podcast.rss'):
     tree = etree.parse(path)
     items = []
@@ -108,6 +110,8 @@ def _read_feed_items(path='podcast.rss'):
         items.append({
             'title': item.findtext('title'),
             'guid': item.findtext('guid'),
+            'description': item.findtext('description'),
+            'summary': item.findtext(_ITUNES_NS + 'summary'),
             'enclosure_url': item.find('enclosure').get('url'),
             'enclosure_length': item.find('enclosure').get('length'),
         })
@@ -189,6 +193,17 @@ class TestRun(unittest.TestCase):
         self.assertEqual(len(store['episodes']), 3)
 
     # ------------------------------------------------------------------
+    # descriptions are HTML, with a plain-text itunes:summary alongside
+    # ------------------------------------------------------------------
+    def test_descriptions_are_html_with_plain_summary(self):
+        self._run()
+        items = _read_feed_items()
+        plenary = next(i for i in items if 'S15E171' in i['title'])
+        self.assertTrue(plenary['description'].startswith('<p>Il-Ħmistax-il Leġiżlatura Seduta Nru: 171'))
+        self.assertNotIn('<p>', plenary['summary'])
+        self.assertTrue(plenary['summary'].startswith('Il-Ħmistax-il Leġiżlatura Seduta Nru: 171'))
+
+    # ------------------------------------------------------------------
     # items that rolled off both sources are still published
     # ------------------------------------------------------------------
     def test_rolled_off_items_kept(self):
@@ -259,7 +274,10 @@ class TestRun(unittest.TestCase):
 
         after = store['episodes'][pac_key]
         self.assertIn('Aġenda', after['description'])
-        self.assertIn('1. Confirmation of Minutes;', after['description'])
+        self.assertIn('<li>1. Confirmation of Minutes;</li>', after['description'])
+        self.assertIn('Aġenda', after['summary'])
+        self.assertIn('- 1. Confirmation of Minutes;', after['summary'])
+        self.assertNotIn('<', after['summary'])
         for field in ('guid', 'title', 'link', 'pubdate', 'kind', 'sources'):
             self.assertEqual(after[field], before[field], field)
 
@@ -320,9 +338,24 @@ class TestBackfillDescriptions(unittest.TestCase):
         key = mirror.prep_s3_key(_AUDIO_PAC)
         store = self._store_with_entry('committee', key)
         app.backfill_descriptions(store, _make_leg_with_committee())
-        description = store['episodes'][key]['description']
-        self.assertIn('Laqgħa Nru: 012', description)
-        self.assertIn('Aġenda', description)
+        entry = store['episodes'][key]
+        self.assertIn('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012', entry['description'])
+        self.assertIn('Aġenda', entry['description'])
+        self.assertIn('Aġenda', entry['summary'])
+
+    @patch('parlament.papi.cache.httpGet', return_value=_empty_page())
+    def test_matched_plenary_entry_uses_legislature_title(self, mock_get):
+        # Regression test: backfill must use the legislature's title for
+        # plenary (matching the live path via get_episode_texts), not the
+        # sitting's own title ("Sessjoni Plenarja" for every sitting) -
+        # those are different strings and must not be confused.
+        key = mirror.prep_s3_key(_AUDIO_171)
+        store = self._store_with_entry('plenary', key)
+        app.backfill_descriptions(store, _make_leg())
+        entry = store['episodes'][key]
+        self.assertTrue(entry['description'].startswith('<p>Il-Ħmistax-il Leġiżlatura Seduta Nru: 171'))
+        self.assertTrue(entry['summary'].startswith('Il-Ħmistax-il Leġiżlatura Seduta Nru: 171'))
+        self.assertNotIn('Sessjoni Plenarja Seduta Nru', entry['description'])
 
     @patch('parlament.papi.cache.httpGet', return_value=_page(b'<html><body>x</body></html>'))
     def test_unmatched_entry_untouched(self, mock_get):

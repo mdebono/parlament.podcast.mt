@@ -186,10 +186,10 @@ def _split_row_into_lines(el):
     flush()
     return lines
 
-def parse_agenda_html(html):
-    """Extract the agenda from a sitting/meeting page as plain-text lines, or
-    None. The page renders the agenda inside <div id="orders">, but its
-    inner markup differs by page type:
+def _extract_agenda_lines(html):
+    """Extract the agenda from a sitting/meeting page as structured
+    ('heading'|'item', text) lines, or None. The page renders the agenda
+    inside <div id="orders">, but its inner markup differs by page type:
 
     - plenary sitting pages: bold <p> elements are section headings (e.g.
       ORDNIJIET TAL-ĠURNATA) and each table row is one or more agenda items.
@@ -209,54 +209,102 @@ def parse_agenda_html(html):
             if not text:
                 continue
             if 'bold' in (el.get('style') or ''):
-                lines.append(text)
+                lines.append(('heading', text))
             else:
-                lines.append('- ' + text)
+                lines.append(('item', text))
         elif el.tag == 'tr':
             for line in _split_row_into_lines(el):
-                lines.append('- ' + line)
+                lines.append(('item', line))
     if not lines:
         return None
-    return '\n'.join(lines)
+    return lines
+
+def lines_to_plain(lines):
+    """Render structured agenda lines as plain text: headings raw, items
+    prefixed '- ', one per line."""
+    return '\n'.join(text if kind == 'heading' else '- ' + text for kind, text in lines)
+
+def lines_to_html(lines):
+    """Render structured agenda lines as HTML: each heading becomes a bold
+    paragraph, and each run of consecutive items becomes one <ul><li>...
+    </li></ul> block."""
+    parts = []
+    items = []
+
+    def flush_items():
+        if items:
+            parts.append('<ul>' + ''.join('<li>{}</li>'.format(text) for text in items) + '</ul>')
+            items.clear()
+
+    for kind, text in lines:
+        if kind == 'heading':
+            flush_items()
+            parts.append('<p><strong>{}</strong></p>'.format(text))
+        else:
+            items.append(text)
+    flush_items()
+    return ''.join(parts)
+
+def parse_agenda_html(html):
+    """Extract the agenda from a sitting/meeting page as plain text, or
+    None if the page or the agenda section is unavailable."""
+    lines = _extract_agenda_lines(html)
+    return lines_to_plain(lines) if lines else None
+
+def get_agenda_lines_by_url(url):
+    """Fetch a sitting/meeting page and return its agenda as structured
+    lines, or None if the page or the agenda section is unavailable."""
+    try:
+        response = cache.httpGet(url, referer=PARLAMENT_URL)
+        response.raise_for_status()
+        return _extract_agenda_lines(response.content)
+    except Exception as e:
+        print('Warning: could not fetch agenda from {}: {}'.format(url, e))
+        return None
 
 def get_agenda_by_url(url):
     """Fetch a sitting/meeting page and return its agenda as plain text, or
     None if the page or the agenda section is unavailable."""
-    try:
-        response = cache.httpGet(url, referer=PARLAMENT_URL)
-        response.raise_for_status()
-        return parse_agenda_html(response.content)
-    except Exception as e:
-        print('Warning: could not fetch agenda from {}: {}'.format(url, e))
-        return None
+    lines = get_agenda_lines_by_url(url)
+    return lines_to_plain(lines) if lines else None
+
+def get_sitting_agenda_lines(sitting):
+    """Fetch the sitting page and return its agenda as structured lines, or
+    None if the page or the agenda section is unavailable."""
+    return get_agenda_lines_by_url(get_sitting_url_mt(sitting))
 
 def get_sitting_agenda(sitting):
     """Fetch the sitting page and return its agenda as plain text, or None if
     the page or the agenda section is unavailable."""
     return get_agenda_by_url(get_sitting_url_mt(sitting))
 
-def build_sitting_description(label, title, number, date, agenda):
-    """Build a plain-text episode description. label is 'Seduta' (plenary)
-    or 'Laqgħa' (committee); agenda is an already-fetched agenda (or None) -
-    callers control the one fetch this needs."""
-    text = '{title} {label} Nru: {number:03} - {date}'
-    description = text.format(
+def build_sitting_texts(label, title, number, date, lines):
+    """Build (description_html, summary) for an episode. label is 'Seduta'
+    (plenary) or 'Laqgħa' (committee); lines is the already-fetched
+    structured agenda (from get_agenda_lines_by_url, or None) - callers
+    control the one fetch this needs, and both text forms are built from
+    the same source of truth so they can never drift apart."""
+    preamble = '{title} {label} Nru: {number:03} - {date}'.format(
         title = title,
         label = label,
         number = number,
         date = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt'),
     )
-    if agenda:
-        description += '\n\nAġenda:\n' + agenda
-    return description
+    summary = preamble
+    html = '<p>{}</p>'.format(preamble)
+    if lines:
+        summary += '\n\nAġenda:\n' + lines_to_plain(lines)
+        html += '<p><strong>Aġenda:</strong></p>' + lines_to_html(lines)
+    return html, summary
 
-def get_episode_description(leg, sitting):
-    return build_sitting_description(
+def get_episode_texts(leg, sitting):
+    """Return (description_html, summary) for a plenary sitting."""
+    return build_sitting_texts(
         'Seduta',
         get_leg_title(leg),
         get_sitting_number(sitting),
         get_sitting_date(sitting),
-        get_sitting_agenda(sitting),
+        get_sitting_agenda_lines(sitting),
     )
 
 def get_plenary_candidates(leg, sittings):
@@ -278,7 +326,7 @@ def get_plenary_candidates(leg, sittings):
             'link': get_sitting_url(sitting),
             'pubdate': get_sitting_date(sitting),
             'source': 'media-archive',
-            'build_description':
-                lambda leg=leg, sitting=sitting: get_episode_description(leg, sitting),
+            'build_texts':
+                lambda leg=leg, sitting=sitting: get_episode_texts(leg, sitting),
         })
     return candidates

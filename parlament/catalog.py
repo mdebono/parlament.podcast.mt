@@ -56,7 +56,7 @@ def episode_key(candidate):
 def has_episode(catalog, key):
     return key in catalog['episodes']
 
-def make_entry(candidate, audio_url, content_length, description, first_seen=None):
+def make_entry(candidate, audio_url, content_length, description, summary, first_seen=None):
     if first_seen is None:
         first_seen = datetime.now(timezone.utc)
     return {
@@ -66,6 +66,10 @@ def make_entry(candidate, audio_url, content_length, description, first_seen=Non
         'guid': audio_url,
         'title': candidate['title'],
         'description': description,
+        # Plain-text counterpart of description, for itunes:summary (which
+        # must not contain HTML). Absent on entries created before this
+        # field existed, until a force_backfill run repairs them.
+        'summary': summary,
         'link': candidate['link'],
         'audio_url': audio_url,
         'content_length': content_length,
@@ -86,12 +90,13 @@ def update_existing(entry, candidate):
     if candidate['source'] not in entry['sources']:
         entry['sources'].append(candidate['source'])
 
-def update_description(entry, description):
-    """Overwrite a catalogued entry's description in place (used by
-    backfilling). Every other field - guid, title, link, pubdate, kind,
-    sources - is left untouched; those identify the episode to already
-    subscribed clients and must never change."""
+def update_texts(entry, description, summary):
+    """Overwrite a catalogued entry's description and summary in place
+    (used by backfilling). Every other field - guid, title, link, pubdate,
+    kind, sources - is left untouched; those identify the episode to
+    already subscribed clients and must never change."""
     entry['description'] = description
+    entry['summary'] = summary
 
 def sorted_entries(catalog):
     """All entries, newest first (key as deterministic tiebreak)."""

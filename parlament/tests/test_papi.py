@@ -258,7 +258,7 @@ def _page_response(content, status_code=200):
     return r
 
 
-class TestGetEpisodeDescription(unittest.TestCase):
+class TestGetEpisodeTexts(unittest.TestCase):
 
     _LEG = {'TitleMT': 'Il-Hmistax-il Legislatura', 'Number': 15}
 
@@ -266,49 +266,60 @@ class TestGetEpisodeDescription(unittest.TestCase):
         return _make_sitting(1, '2025-06-30T16:00:00')
 
     @patch('parlament.papi.cache.httpGet', return_value=_page_response(_AGENDA_HTML))
-    def test_description_includes_agenda(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertIn('Il-Hmistax-il Legislatura Seduta Nru: 001', description)
-        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n', description)
-        self.assertIn('- Mozzjoni Nru 15 - Xi Haga', description)
+    def test_texts_include_agenda(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertIn('Il-Hmistax-il Legislatura Seduta Nru: 001', summary)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n', summary)
+        self.assertIn('- Mozzjoni Nru 15 - Xi Haga', summary)
+        self.assertIn('<p>Il-Hmistax-il Legislatura Seduta Nru: 001', html)
+        self.assertIn('<p><strong>Aġenda:</strong></p>', html)
+        self.assertIn('<p><strong>MOZZJONIJIET</strong></p>', html)
+        self.assertIn('<li>Mozzjoni Nru 15 - Xi Haga</li>', html)
         mock_get.assert_called_once_with(papi.PARLAMENT_URL + '/mt/test', referer=papi.PARLAMENT_URL)
 
     @patch('parlament.papi.cache.httpGet', return_value=_page_response(_NO_AGENDA_HTML))
-    def test_description_without_agenda_unchanged(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertNotIn('Aġenda', description)
-        self.assertTrue(description.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+    def test_texts_without_agenda_unchanged(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
+        self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+        self.assertEqual(html, '<p>' + summary + '</p>')
 
     @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
-    def test_description_survives_fetch_failure(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertNotIn('Aġenda', description)
-        self.assertIn('Seduta Nru: 001', description)
+    def test_texts_survive_fetch_failure(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', summary)
+        self.assertIn('Seduta Nru: 001', summary)
 
 
-class TestBuildSittingDescription(unittest.TestCase):
+_AGENDA_LINES = [('heading', 'MOZZJONIJIET'), ('item', 'Xi Haga')]
+
+
+class TestBuildSittingTexts(unittest.TestCase):
 
     _DATE = pytz.timezone('Europe/Malta').localize(datetime(2025, 6, 30, 16, 0))
 
     def test_plenary_label(self):
-        description = papi.build_sitting_description(
+        html, summary = papi.build_sitting_texts(
             'Seduta', 'Il-Hmistax-il Legislatura', 1, self._DATE, None)
-        self.assertTrue(description.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
-        self.assertNotIn('Aġenda', description)
+        self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+        self.assertNotIn('Aġenda', summary)
+        self.assertEqual(html, '<p>' + summary + '</p>')
 
     def test_committee_label(self):
-        description = papi.build_sitting_description(
+        html, summary = papi.build_sitting_texts(
             'Laqgħa', 'Kumitat dwar il-Kontijiet Pubbliċi', 12, self._DATE, None)
-        self.assertTrue(description.startswith('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012'))
+        self.assertTrue(summary.startswith('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012'))
 
     def test_agenda_appended_when_present(self):
-        description = papi.build_sitting_description(
-            'Seduta', 'Title', 1, self._DATE, 'MOZZJONIJIET\n- Xi Haga')
-        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', description)
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
+        self.assertIn('<p><strong>Aġenda:</strong></p><p><strong>MOZZJONIJIET</strong></p><ul><li>Xi Haga</li></ul>', html)
 
     def test_agenda_omitted_when_none(self):
-        description = papi.build_sitting_description('Seduta', 'Title', 1, self._DATE, None)
-        self.assertNotIn('Aġenda', description)
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None)
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
 
 
 class TestPathToMtUrl(unittest.TestCase):
@@ -370,8 +381,9 @@ class TestGetPlenaryCandidates(unittest.TestCase):
         sitting = self._sitting_with_audio(171, '2023-11-14T16:00:00', _RIGHT_URL)
         [candidate] = papi.get_plenary_candidates(self._LEG, [sitting])
         mock_get.assert_not_called()
-        description = candidate['build_description']()
-        self.assertIn('Seduta Nru: 171', description)
+        html, summary = candidate['build_texts']()
+        self.assertIn('Seduta Nru: 171', summary)
+        self.assertIn('Seduta Nru: 171', html)
         mock_get.assert_called_once()
 
 

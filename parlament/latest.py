@@ -130,25 +130,35 @@ def _meeting_title(leg, meeting):
         return '{title} - {date}'.format(
             title=title, date=_format_day_mt(parse_meeting_date(meeting['MeetingDate'])))
 
-def _build_description(leg, meeting):
+def _fallback_texts(title, date, lines):
+    """(html, summary) for a plain "title - date" preamble, with agenda
+    appended if lines is given. Used for events and committees without a
+    meeting number - there's no meaningful "Nru:" to show for either."""
+    preamble = '{title} - {date}'.format(title=title, date=_format_date_mt(date))
+    summary = preamble
+    html = '<p>{}</p>'.format(preamble)
+    if lines:
+        summary += '\n\nAġenda:\n' + papi.lines_to_plain(lines)
+        html += '<p><strong>Aġenda:</strong></p>' + papi.lines_to_html(lines)
+    return html, summary
+
+def _build_texts(leg, meeting):
     title = get_meeting_title(meeting)
     kind = get_meeting_kind(meeting)
     number = get_meeting_number(meeting)
     date = parse_meeting_date(meeting['MeetingDate'])
+    lines = None
+    if kind != 'event' and meeting.get('MeetingURL'):
+        lines = papi.get_agenda_lines_by_url(papi.path_to_mt_url(meeting['MeetingURL']))
     if kind == 'plenary':
         # Delegate to the same builder app.py's backfill uses, so a
         # committee's wording never drifts from what a re-match against
         # the archive would produce.
-        description = papi.build_sitting_description('Seduta', papi.get_leg_title(leg), number, date, None)
+        return papi.build_sitting_texts('Seduta', papi.get_leg_title(leg), number, date, lines)
     elif kind == 'committee' and number:
-        description = papi.build_sitting_description('Laqgħa', title, number, date, None)
+        return papi.build_sitting_texts('Laqgħa', title, number, date, lines)
     else:
-        description = '{title} - {date}'.format(title=title, date=_format_date_mt(date))
-    if kind != 'event' and meeting.get('MeetingURL'):
-        agenda = papi.get_agenda_by_url(papi.path_to_mt_url(meeting['MeetingURL']))
-        if agenda:
-            description += '\n\nAġenda:\n' + agenda
-    return description
+        return _fallback_texts(title, date, lines)
 
 def _meeting_candidates(leg, meeting):
     audio_urls = meeting.get('AudioURLs') or []
@@ -176,8 +186,8 @@ def _meeting_candidates(leg, meeting):
             'link': papi.PARLAMENT_URL + meeting['MeetingURL'],
             'pubdate': pubdate,
             'source': 'latest-media',
-            'build_description':
-                lambda leg=leg, meeting=meeting: _build_description(leg, meeting),
+            'build_texts':
+                lambda leg=leg, meeting=meeting: _build_texts(leg, meeting),
         })
     return candidates
 

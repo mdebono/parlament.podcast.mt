@@ -20,7 +20,7 @@ def _make_candidate(**overrides):
         'link': 'https://parlament.mt/15th-leg/plenary-session/ps-171/',
         'pubdate': _MALTA.localize(datetime(2023, 11, 14, 16, 0)),
         'source': 'media-archive',
-        'build_description': lambda: 'description',
+        'build_texts': lambda: ('description', 'summary'),
     }
     candidate.update(overrides)
     return candidate
@@ -33,6 +33,7 @@ def _make_entry(candidate=None, **kwargs):
         audio_url=kwargs.get('audio_url', 'https://r2.parlament.podcast.mt/Audio/x.mp3'),
         content_length=kwargs.get('content_length', '123'),
         description=kwargs.get('description', 'description'),
+        summary=kwargs.get('summary', 'summary'),
         first_seen=kwargs.get('first_seen', datetime(2026, 7, 11, tzinfo=timezone.utc)),
     )
 
@@ -107,6 +108,7 @@ class TestMakeEntry(unittest.TestCase):
             'guid': 'https://r2.parlament.podcast.mt/Audio/x.mp3',
             'title': 'Sessjoni Plenarja S15E171',
             'description': 'description',
+            'summary': 'summary',
             'link': 'https://parlament.mt/15th-leg/plenary-session/ps-171/',
             'audio_url': 'https://r2.parlament.podcast.mt/Audio/x.mp3',
             'content_length': '123',
@@ -143,13 +145,14 @@ class TestUpdateExisting(unittest.TestCase):
         self.assertEqual(entry['pubdate'], '2023-11-14T16:00:00+01:00')
 
 
-class TestUpdateDescription(unittest.TestCase):
+class TestUpdateTexts(unittest.TestCase):
 
-    def test_only_description_changes(self):
+    def test_only_description_and_summary_change(self):
         entry = _make_entry()
         before = dict(entry)
-        catalog.update_description(entry, 'A rebuilt description')
+        catalog.update_texts(entry, 'A rebuilt description', 'A rebuilt summary')
         self.assertEqual(entry['description'], 'A rebuilt description')
+        self.assertEqual(entry['summary'], 'A rebuilt summary')
         for field in ('guid', 'title', 'link', 'audio_url', 'content_length',
                       'pubdate', 'kind', 'sources', 'source_audio_path', 'first_seen'):
             self.assertEqual(entry[field], before[field], field)
@@ -161,8 +164,8 @@ class TestSortedEntries(unittest.TestCase):
         old = _make_candidate(pubdate=_MALTA.localize(datetime(2023, 1, 1)), title='old')
         new = _make_candidate(pubdate=_MALTA.localize(datetime(2024, 1, 1)), title='new')
         store = catalog.new_catalog()
-        catalog.add_episode(store, 'a', catalog.make_entry(old, 'u1', '', 'd'))
-        catalog.add_episode(store, 'b', catalog.make_entry(new, 'u2', '', 'd'))
+        catalog.add_episode(store, 'a', catalog.make_entry(old, 'u1', '', 'd', 's'))
+        catalog.add_episode(store, 'b', catalog.make_entry(new, 'u2', '', 'd', 's'))
         titles = [entry['title'] for entry in catalog.sorted_entries(store)]
         self.assertEqual(titles, ['new', 'old'])
 
