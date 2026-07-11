@@ -187,22 +187,31 @@ def _split_row_into_lines(el):
     return lines
 
 def parse_agenda_html(html):
-    """Extract the agenda from a sitting page as plain-text lines, or None.
+    """Extract the agenda from a sitting/meeting page as plain-text lines, or
+    None. The page renders the agenda inside <div id="orders">, but its
+    inner markup differs by page type:
 
-    The sitting page renders the agenda inside <div id="orders">: bold <p>
-    elements are section headings (e.g. ORDNIJIET TAL-ĠURNATA) and each table
-    row is one or more agenda items."""
+    - plenary sitting pages: bold <p> elements are section headings (e.g.
+      ORDNIJIET TAL-ĠURNATA) and each table row is one or more agenda items.
+    - committee meeting pages: agenda items are plain (non-bold) <p>
+      elements with no table at all.
+
+    Table-nested <p> elements are excluded here because their text is
+    already extracted via the <tr> branch below."""
     doc = lxml.html.fromstring(html)
     orders = doc.xpath('//div[@id="orders"]')
     if not orders:
         return None
     lines = []
     for el in orders[0].iter():
-        if (el.tag == 'p' and 'bold' in (el.get('style') or '')
-                and not any(a.tag == 'table' for a in el.iterancestors())):
+        if el.tag == 'p' and not any(a.tag == 'table' for a in el.iterancestors()):
             text = ' '.join(el.text_content().split())
-            if text:
+            if not text:
+                continue
+            if 'bold' in (el.get('style') or ''):
                 lines.append(text)
+            else:
+                lines.append('- ' + text)
         elif el.tag == 'tr':
             for line in _split_row_into_lines(el):
                 lines.append('- ' + line)

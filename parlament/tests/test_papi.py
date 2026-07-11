@@ -177,7 +177,32 @@ _PACKED_ROW_HTML = '''
 '''.encode('utf-8')
 
 
+# Committee meeting pages render the agenda as plain (non-bold) <p>
+# elements with no table at all - captured from a live House Business
+# Committee page (HBC 002, 07-Jul-2026).
+_COMMITTEE_AGENDA_HTML = '''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+    <div class="row">
+        <div class="col-md-12 container">
+            <p>1. Confirmation of Minutes;</p>
+            <p>2. House Business; and</p>
+            <p>3. Other Matters</p>
+        </div>
+    </div>
+</div>
+</body></html>
+'''.encode('utf-8')
+
+
 class TestParseAgendaHtml(unittest.TestCase):
+
+    def test_parses_committee_plain_paragraph_items(self):
+        agenda = papi.parse_agenda_html(_COMMITTEE_AGENDA_HTML)
+        self.assertEqual(agenda,
+            '- 1. Confirmation of Minutes;\n'
+            '- 2. House Business; and\n'
+            '- 3. Other Matters')
 
     def test_parses_headings_and_items(self):
         agenda = papi.parse_agenda_html(_AGENDA_HTML)
