@@ -1,38 +1,99 @@
-from parlament import papi, pfeed, mirror
+from datetime import datetime
 import sys
 
-def run():
-    leg = papi.get_leg()
-    sittings = papi.get_plenary_sittings(leg)
+from parlament import papi, latest, pfeed, mirror, catalog
 
+# Candidates are plain dicts shared by both discovery sources
+# (papi.get_plenary_candidates, latest.get_candidates):
+#   source_audio_path  encoded site-relative path of the mp3 (/Audio/...)
+#   kind               'plenary' | 'committee' | 'event'
+#   title              episode title
+#   link               absolute URL of the sitting/meeting page
+#   pubdate            aware datetime
+#   source             'media-archive' | 'latest-media'
+#   build_description  zero-arg callable; only invoked for new episodes so
+#                      agenda pages are not re-fetched on every run
+
+ARCHIVE_SITTING_LIMIT = 20
+
+def gather_candidates():
+    """Collect candidates from both sources. Either source may fail without
+    taking down the run; the catalogue still republishes everything known."""
+    leg = None
+    candidates = []
+    try:
+        leg = papi.get_leg()
+        sittings = papi.get_plenary_sittings(leg)
+        recent = list(reversed(sittings))[:ARCHIVE_SITTING_LIMIT]
+        candidates += papi.get_plenary_candidates(leg, recent)
+    except Exception as e:
+        print(f'Warning: media-archive source failed: {e}', file=sys.stderr)
+
+    try:
+        meetings = latest.get_latest_media()
+        candidates += latest.get_candidates(leg, meetings)
+    except Exception as e:
+        print(f'Warning: latest-media source failed: {e}', file=sys.stderr)
+
+    return candidates
+
+def ingest(store, candidates):
+    """Merge candidates into the catalogue, mirroring audio for new ones.
+
+    Candidates arrive archive-first, so when both sources see the same
+    recording the archive's canonical metadata is what gets frozen. For
+    already-catalogued episodes the stored entry wins - published metadata
+    never mutates, so podcast clients never see edits or re-downloads."""
+    for candidate in candidates:
+        key = catalog.episode_key(candidate)
+        if catalog.has_episode(store, key):
+            entry = store['episodes'][key]
+            catalog.update_existing(entry, candidate)
+            if not entry['content_length']:
+                entry['content_length'] = mirror.get_r2_content_length(key)
+            continue
+
+        audio_url = papi.PARLAMENT_URL + candidate['source_audio_path']
+        try:
+            r2_url = mirror.mirror_audio_to_r2(audio_url, candidate['source_audio_path'])
+        except Exception as e:
+            # Skip: the candidate is not catalogued, so it is retried on the
+            # next run. An entry must never reference audio missing from R2.
+            print(f'Error mirroring {audio_url} to R2: {e}', file=sys.stderr)
+            continue
+        content_length = mirror.get_r2_content_length(key)
+        description = candidate['build_description']()
+        entry = catalog.make_entry(candidate, r2_url, content_length, description)
+        catalog.add_episode(store, key, entry)
+
+def build_feed(store):
     feed = pfeed.init_feed()
-    seen_urls = set()
-    for sitting in list(reversed(sittings))[:20]:
-        try:
-            s3_key = papi.get_bare_audio_url(sitting)
-        except Exception as e:
-            print(f"Warning: skipping sitting {papi.get_sitting_number(sitting)}: {e}", file=sys.stderr)
-            continue
-        if s3_key in seen_urls:
-            print(f"WARNING: Duplicate URL for sitting {papi.get_sitting_number(sitting)}: {s3_key}", file=sys.stderr)
-            continue
-        seen_urls.add(s3_key)
-
-        audio_url = papi.PARLAMENT_URL + s3_key
-
-        # Mirror audio to R2 and use the R2 URL in the feed
-        try:
-            r2_url = mirror.mirror_audio_to_r2(audio_url, s3_key)
-        except Exception as e:
-            print(f"Error mirroring {audio_url} to R2: {e}", file=sys.stderr)
-            continue  # skip this item if mirroring fails
-        
+    for entry in catalog.sorted_entries(store):
         pfeed.add_item(feed,
-            title = papi.get_episode_title(leg, sitting),
-            description = papi.get_episode_description(leg, sitting),
-            link = papi.get_sitting_url(sitting),
-            audio_url = r2_url,
-            content_length = papi.get_audio_content_length(audio_url),
-            pubdate = papi.get_sitting_date(sitting),
+            title=entry['title'],
+            description=entry['description'],
+            link=entry['link'],
+            audio_url=entry['audio_url'],
+            content_length=entry['content_length'],
+            pubdate=datetime.fromisoformat(entry['pubdate']),
+            unique_id=entry['guid'],
         )
+    return feed
+
+def run():
+    store = catalog.load_catalog()
+    previous_count = len(store['episodes'])
+
+    candidates = gather_candidates()
+    if not candidates and previous_count == 0:
+        raise RuntimeError('no sources available and catalogue is empty; nothing to publish')
+
+    ingest(store, candidates)
+
+    # The catalogue write is the durable commit point: it happens after all
+    # mirroring, so every entry has its mp3 in R2, and before the feed write,
+    # so the published feed never gets ahead of the catalogue.
+    catalog.save_catalog(store, previous_count)
+
+    feed = build_feed(store)
     pfeed.write_feed(feed, 'podcast.rss')

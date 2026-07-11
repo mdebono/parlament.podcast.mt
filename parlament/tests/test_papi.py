@@ -259,6 +259,70 @@ class TestGetEpisodeDescription(unittest.TestCase):
         self.assertIn('Seduta Nru: 001', description)
 
 
+class TestPathToMtUrl(unittest.TestCase):
+
+    def test_language_neutral_path(self):
+        self.assertEqual(papi.path_to_mt_url('/15th-leg/pac/meeting-12/'),
+                         papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
+
+    def test_en_path_switched_to_mt(self):
+        self.assertEqual(papi.path_to_mt_url('/en/15th-leg/pac/meeting-12/'),
+                         papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
+
+
+class TestGetAgendaByUrl(unittest.TestCase):
+
+    @patch('parlament.papi.cache.httpGet', return_value=_page_response(_AGENDA_HTML))
+    def test_returns_agenda(self, mock_get):
+        agenda = papi.get_agenda_by_url('https://parlament.mt/mt/test')
+        self.assertIn('MOZZJONIJIET', agenda)
+        mock_get.assert_called_once_with('https://parlament.mt/mt/test',
+                                         referer=papi.PARLAMENT_URL)
+
+    @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
+    def test_fetch_failure_returns_none(self, mock_get):
+        self.assertIsNone(papi.get_agenda_by_url('https://parlament.mt/mt/test'))
+
+
+class TestGetPlenaryCandidates(unittest.TestCase):
+
+    _LEG = {'TitleMT': 'Il-Hmistax-il Legislatura', 'Number': 15}
+
+    def _sitting_with_audio(self, number, iso_date, url):
+        sitting = _make_sitting(number, iso_date)
+        sitting['Media'] = [{'IsVideo': False, 'Url': url}]
+        return sitting
+
+    @patch('parlament.papi.cache.httpHead')
+    def test_builds_candidates(self, mock_head):
+        sitting = self._sitting_with_audio(171, '2023-11-14T16:00:00', _RIGHT_URL)
+        [candidate] = papi.get_plenary_candidates(self._LEG, [sitting])
+        self.assertEqual(candidate['source_audio_path'], _RIGHT_URL)
+        self.assertEqual(candidate['kind'], 'plenary')
+        self.assertEqual(candidate['title'], 'Sessjoni Plenarja S15E171')
+        self.assertEqual(candidate['link'], papi.PARLAMENT_URL + '/test')
+        self.assertEqual(candidate['source'], 'media-archive')
+        self.assertEqual(candidate['pubdate'], papi.get_sitting_date(sitting))
+
+    @patch('parlament.papi.cache.httpHead')
+    def test_sitting_without_audio_skipped(self, mock_head):
+        no_audio = _make_sitting(5, '2023-01-01T10:00:00')
+        with_audio = self._sitting_with_audio(171, '2023-11-14T16:00:00', _RIGHT_URL)
+        candidates = papi.get_plenary_candidates(self._LEG, [no_audio, with_audio])
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]['title'], 'Sessjoni Plenarja S15E171')
+
+    @patch('parlament.papi.cache.httpGet', return_value=_page_response(_NO_AGENDA_HTML))
+    @patch('parlament.papi.cache.httpHead')
+    def test_description_built_lazily(self, mock_head, mock_get):
+        sitting = self._sitting_with_audio(171, '2023-11-14T16:00:00', _RIGHT_URL)
+        [candidate] = papi.get_plenary_candidates(self._LEG, [sitting])
+        mock_get.assert_not_called()
+        description = candidate['build_description']()
+        self.assertIn('Seduta Nru: 171', description)
+        mock_get.assert_called_once()
+
+
 class TestGetBareAudioUrl(unittest.TestCase):
 
     def test_no_audio_raises(self):

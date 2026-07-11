@@ -72,5 +72,19 @@ class TestParlamentFeed(unittest.TestCase):
             "Each feed item must have a unique_id (GUID) so podcast apps can track episodes")
         self.assertEqual(item['unique_id'], audio_url)
 
+    def test_add_item_explicit_unique_id(self):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='A test episode',
+            link='https://parlament.mt/test',
+            audio_url='https://r2.parlament.podcast.mt/Audio/new-location.mp3',
+            unique_id='https://r2.parlament.podcast.mt/Audio/original guid.mp3',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        self.assertEqual(feed.items[0]['unique_id'],
+            'https://r2.parlament.podcast.mt/Audio/original guid.mp3',
+            "an explicitly stored guid must win over the enclosure URL")
+
 if __name__ == '__main__':
     unittest.main()
