@@ -110,6 +110,22 @@ class TestParlamentFeed(unittest.TestCase):
         feed.write(out, 'utf8')
         self.assertIn('<itunes:summary>A test episode</itunes:summary>', out.getvalue())
 
+    def test_itunes_summary_emitted_even_when_empty_string(self):
+        # An empty summary is a data problem worth surfacing, not silently
+        # dropping - distinguish it from summary genuinely absent (None).
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='<p>A test episode</p>',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            summary='',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        out = io.StringIO()
+        feed.write(out, 'utf8')
+        self.assertIn('<itunes:summary/>', out.getvalue())
+
     def test_itunes_summary_omitted_when_absent(self):
         feed = pfeed.init_feed()
         pfeed.add_item(feed,

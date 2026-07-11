@@ -70,8 +70,6 @@ def ingest(store, candidates):
         entry = catalog.make_entry(candidate, r2_url, content_length, description, summary)
         catalog.add_episode(store, key, entry)
 
-_KIND_LABELS = {'plenary': 'Seduta', 'committee': 'Laqgħa'}
-
 def archive_sitting_index(leg):
     """Map every episode_key reachable from the media archive - across all
     CommitteeTypes, not just Plenary - to its sitting dict. The archive
@@ -98,14 +96,12 @@ def backfill_descriptions(store, leg):
     carries) are left untouched."""
     index = archive_sitting_index(leg)
     for key, entry in store['episodes'].items():
-        label = _KIND_LABELS.get(entry['kind'])
         sitting = index.get(key)
-        if label is None or sitting is None:
+        if sitting is None:
             continue
-        # Plenary's canonical subject is the legislature's own title (as
-        # the live path uses via get_episode_texts); committees use their
-        # own sitting title, same as the live widget path.
-        title = papi.get_leg_title(leg) if entry['kind'] == 'plenary' else papi.get_sitting_title(sitting)
+        label, title = papi.label_and_title_for_sitting(entry['kind'], leg, sitting)
+        if label is None:
+            continue
         description, summary = papi.build_sitting_texts(
             label,
             title,

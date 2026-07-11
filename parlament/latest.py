@@ -110,10 +110,6 @@ def normalize_audio_path(url):
         path = '/' + path
     return path
 
-def _format_date_mt(date):
-    return babel.dates.format_datetime(
-        datetime=date, format=papi.BABEL_MT_DATETIME_FORMAT, locale='mt')
-
 def _format_day_mt(date):
     return babel.dates.format_date(date=date.date(), format=BABEL_MT_DATE_FORMAT, locale='mt')
 
@@ -130,18 +126,6 @@ def _meeting_title(leg, meeting):
         return '{title} - {date}'.format(
             title=title, date=_format_day_mt(parse_meeting_date(meeting['MeetingDate'])))
 
-def _fallback_texts(title, date, lines):
-    """(html, summary) for a plain "title - date" preamble, with agenda
-    appended if lines is given. Used for events and committees without a
-    meeting number - there's no meaningful "Nru:" to show for either."""
-    preamble = '{title} - {date}'.format(title=title, date=_format_date_mt(date))
-    summary = preamble
-    html = '<p>{}</p>'.format(preamble)
-    if lines:
-        summary += '\n\nAġenda:\n' + papi.lines_to_plain(lines)
-        html += '<p><strong>Aġenda:</strong></p>' + papi.lines_to_html(lines)
-    return html, summary
-
 def _build_texts(leg, meeting):
     title = get_meeting_title(meeting)
     kind = get_meeting_kind(meeting)
@@ -150,15 +134,17 @@ def _build_texts(leg, meeting):
     lines = None
     if kind != 'event' and meeting.get('MeetingURL'):
         lines = papi.get_agenda_lines_by_url(papi.path_to_mt_url(meeting['MeetingURL']))
+    # Always delegate to the one shared builder (also used by app.py's
+    # backfill), so a committee's wording can never drift from what a
+    # re-match against the archive would produce - label=None covers
+    # events and committees without a meeting number, where there's no
+    # meaningful "Nru:" to show.
     if kind == 'plenary':
-        # Delegate to the same builder app.py's backfill uses, so a
-        # committee's wording never drifts from what a re-match against
-        # the archive would produce.
         return papi.build_sitting_texts('Seduta', papi.get_leg_title(leg), number, date, lines)
     elif kind == 'committee' and number:
         return papi.build_sitting_texts('Laqgħa', title, number, date, lines)
     else:
-        return _fallback_texts(title, date, lines)
+        return papi.build_sitting_texts(None, title, None, date, lines)
 
 def _meeting_candidates(leg, meeting):
     audio_urls = meeting.get('AudioURLs') or []

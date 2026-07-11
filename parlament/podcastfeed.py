@@ -37,5 +37,5 @@ class PodcastFeed(Rss201rev2Feed):
         super().add_item_elements(handler, item)
         if item.get('duration') is not None:
             handler.addQuickElement('itunes:duration', str(item['duration']))
-        if item.get('summary'):
+        if item.get('summary') is not None:
             handler.addQuickElement('itunes:summary', item['summary'])
