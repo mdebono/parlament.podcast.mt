@@ -148,6 +148,37 @@ def correct_audio_url(sitting, audio_url):
 
 _SENTENCE_END_RE = re.compile(r'[.!?:]\s*$')
 
+def _split_on_br(el):
+    """Split an element's content into one line per <br>-separated segment,
+    every <br> starting a new line unconditionally. Used for committee
+    agenda items, which are commonly packed into a single <p> as
+    "1. Foo;<br />2. Bar; u<br />3. Baz" rather than separate <p> elements
+    - text_content() would otherwise silently run them together with no
+    separator at all, since <br> contributes no text of its own. Unlike
+    _split_row_into_lines, there's no sentence-final-punctuation heuristic
+    here: these enumerated items typically end in ';', not '.', so that
+    heuristic would merge them right back together."""
+    lines = []
+    buf = []
+
+    def flush():
+        text = ' '.join(''.join(buf).split())
+        buf.clear()
+        if text:
+            lines.append(text)
+
+    if el.text:
+        buf.append(el.text)
+    for child in el:
+        if child.tag == 'br':
+            flush()
+        else:
+            buf.append(child.text_content())
+        if child.tail:
+            buf.append(child.tail)
+    flush()
+    return lines
+
 def _split_row_into_lines(el):
     """Split a <tr>'s content into text lines, breaking at <p> and <br>
     boundaries. Most rows are a single line, but some (e.g. the opening
@@ -213,13 +244,13 @@ def _extract_agenda_lines(html):
     lines = []
     for el in orders[0].iter():
         if el.tag == 'p' and not any(a.tag == 'table' for a in el.iterancestors()):
-            text = ' '.join(el.text_content().split())
-            if not text:
-                continue
             if 'bold' in (el.get('style') or ''):
-                lines.append(('heading', text))
+                text = ' '.join(el.text_content().split())
+                if text:
+                    lines.append(('heading', text))
             elif not has_table:
-                lines.append(('item', text))
+                for line in _split_on_br(el):
+                    lines.append(('item', line))
         elif el.tag == 'tr':
             for line in _split_row_into_lines(el):
                 lines.append(('item', line))

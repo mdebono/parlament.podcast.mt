@@ -196,6 +196,22 @@ _COMMITTEE_AGENDA_HTML = '''
 </body></html>
 '''.encode('utf-8')
 
+# The Maltese version of the same committee page (HBC 002) packs all three
+# items into a single <p> separated by <br /> instead of three separate
+# <p> elements - captured live after a production episode's agenda came
+# through as one run-on line with no separators at all.
+_COMMITTEE_AGENDA_HTML_BR_PACKED = '''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+    <div class="row">
+        <div class="col-md-12 container">
+            <p>1. Konferma tal-Minuti;<br />2. Xogħol tal-Kamra; u<br />3. Affarijiet oħra</p>
+        </div>
+    </div>
+</div>
+</body></html>
+'''.encode('utf-8')
+
 
 class TestParseAgendaHtml(unittest.TestCase):
 
@@ -205,6 +221,16 @@ class TestParseAgendaHtml(unittest.TestCase):
             '- 1. Confirmation of Minutes;\n'
             '- 2. House Business; and\n'
             '- 3. Other Matters')
+
+    def test_parses_br_packed_committee_items(self):
+        # Items enumerated "1. Foo;<br />2. Bar; u<br />3. Baz" inside a
+        # single <p> - a real production episode's agenda came through as
+        # one run-on line with no separator at all before this was fixed.
+        agenda = papi.parse_agenda_html(_COMMITTEE_AGENDA_HTML_BR_PACKED)
+        self.assertEqual(agenda,
+            '- 1. Konferma tal-Minuti;\n'
+            '- 2. Xogħol tal-Kamra; u\n'
+            '- 3. Affarijiet oħra')
 
     def test_parses_headings_and_items(self):
         agenda = papi.parse_agenda_html(_AGENDA_HTML)
