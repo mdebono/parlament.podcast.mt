@@ -235,7 +235,7 @@ class TestBuildDescription(unittest.TestCase):
         [candidate] = latest.get_candidates(_LEG, [_make_meeting()])
         description = candidate['build_description']()
         self.assertTrue(description.startswith(
-            'Kumitat dwar il-Kontijiet Pubbliċi - Laqgħa Nru: 012 - '))
+            'Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012 - '))
         self.assertIn('\n\nAġenda:\nPUNT\n- Xi ħaġa', description)
         mock_agenda.assert_called_once_with(
             papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')

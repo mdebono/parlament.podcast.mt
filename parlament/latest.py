@@ -134,15 +134,16 @@ def _build_description(leg, meeting):
     title = get_meeting_title(meeting)
     kind = get_meeting_kind(meeting)
     number = get_meeting_number(meeting)
-    date_mt = _format_date_mt(parse_meeting_date(meeting['MeetingDate']))
+    date = parse_meeting_date(meeting['MeetingDate'])
     if kind == 'plenary':
-        description = '{leg_title} Seduta Nru: {episode:03} - {date}'.format(
-            leg_title=papi.get_leg_title(leg), episode=number, date=date_mt)
+        # Delegate to the same builder app.py's backfill uses, so a
+        # committee's wording never drifts from what a re-match against
+        # the archive would produce.
+        description = papi.build_sitting_description('Seduta', papi.get_leg_title(leg), number, date, None)
     elif kind == 'committee' and number:
-        description = '{title} - Laqgħa Nru: {number:03} - {date}'.format(
-            title=title, number=number, date=date_mt)
+        description = papi.build_sitting_description('Laqgħa', title, number, date, None)
     else:
-        description = '{title} - {date}'.format(title=title, date=date_mt)
+        description = '{title} - {date}'.format(title=title, date=_format_date_mt(date))
     if kind != 'event' and meeting.get('MeetingURL'):
         agenda = papi.get_agenda_by_url(papi.path_to_mt_url(meeting['MeetingURL']))
         if agenda:

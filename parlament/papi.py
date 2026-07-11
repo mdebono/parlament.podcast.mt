@@ -235,18 +235,29 @@ def get_sitting_agenda(sitting):
     the page or the agenda section is unavailable."""
     return get_agenda_by_url(get_sitting_url_mt(sitting))
 
-def get_episode_description(leg, sitting):
-    text = '{leg_title} Seduta Nru: {episode:03} - {date}'
-    date = get_sitting_date(sitting)
+def build_sitting_description(label, title, number, date, agenda):
+    """Build a plain-text episode description. label is 'Seduta' (plenary)
+    or 'Laqgħa' (committee); agenda is an already-fetched agenda (or None) -
+    callers control the one fetch this needs."""
+    text = '{title} {label} Nru: {number:03} - {date}'
     description = text.format(
-        leg_title = get_leg_title(leg),
-        episode = get_sitting_number(sitting),
+        title = title,
+        label = label,
+        number = number,
         date = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt'),
     )
-    agenda = get_sitting_agenda(sitting)
     if agenda:
         description += '\n\nAġenda:\n' + agenda
     return description
+
+def get_episode_description(leg, sitting):
+    return build_sitting_description(
+        'Seduta',
+        get_leg_title(leg),
+        get_sitting_number(sitting),
+        get_sitting_date(sitting),
+        get_sitting_agenda(sitting),
+    )
 
 def get_plenary_candidates(leg, sittings):
     """Build candidate dicts (see app.py) for plenary sittings from the media

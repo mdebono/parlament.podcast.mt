@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      force_backfill:
+        description: 'Rebuild descriptions for all catalogued episodes from archive data'
+        type: boolean
+        default: false
 
 permissions:
   pages: write
@@ -39,6 +44,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION || 'auto' }}
+          FORCE_BACKFILL: ${{ inputs.force_backfill }}
         run: python -m parlament
 
       - name: Copy RSS to public directory

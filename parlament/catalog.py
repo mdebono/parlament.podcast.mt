@@ -86,6 +86,13 @@ def update_existing(entry, candidate):
     if candidate['source'] not in entry['sources']:
         entry['sources'].append(candidate['source'])
 
+def update_description(entry, description):
+    """Overwrite a catalogued entry's description in place (used by
+    backfilling). Every other field - guid, title, link, pubdate, kind,
+    sources - is left untouched; those identify the episode to already
+    subscribed clients and must never change."""
+    entry['description'] = description
+
 def sorted_entries(catalog):
     """All entries, newest first (key as deterministic tiebreak)."""
     items = sorted(catalog['episodes'].items(),

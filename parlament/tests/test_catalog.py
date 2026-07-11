@@ -143,6 +143,18 @@ class TestUpdateExisting(unittest.TestCase):
         self.assertEqual(entry['pubdate'], '2023-11-14T16:00:00+01:00')
 
 
+class TestUpdateDescription(unittest.TestCase):
+
+    def test_only_description_changes(self):
+        entry = _make_entry()
+        before = dict(entry)
+        catalog.update_description(entry, 'A rebuilt description')
+        self.assertEqual(entry['description'], 'A rebuilt description')
+        for field in ('guid', 'title', 'link', 'audio_url', 'content_length',
+                      'pubdate', 'kind', 'sources', 'source_audio_path', 'first_seen'):
+            self.assertEqual(entry[field], before[field], field)
+
+
 class TestSortedEntries(unittest.TestCase):
 
     def test_newest_first(self):

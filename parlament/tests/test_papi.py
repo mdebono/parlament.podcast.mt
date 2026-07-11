@@ -2,6 +2,8 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
+import pytz
+
 from parlament import papi
 
 # ---------------------------------------------------------------------------
@@ -282,6 +284,31 @@ class TestGetEpisodeDescription(unittest.TestCase):
         description = papi.get_episode_description(self._LEG, self._sitting())
         self.assertNotIn('Aġenda', description)
         self.assertIn('Seduta Nru: 001', description)
+
+
+class TestBuildSittingDescription(unittest.TestCase):
+
+    _DATE = pytz.timezone('Europe/Malta').localize(datetime(2025, 6, 30, 16, 0))
+
+    def test_plenary_label(self):
+        description = papi.build_sitting_description(
+            'Seduta', 'Il-Hmistax-il Legislatura', 1, self._DATE, None)
+        self.assertTrue(description.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+        self.assertNotIn('Aġenda', description)
+
+    def test_committee_label(self):
+        description = papi.build_sitting_description(
+            'Laqgħa', 'Kumitat dwar il-Kontijiet Pubbliċi', 12, self._DATE, None)
+        self.assertTrue(description.startswith('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012'))
+
+    def test_agenda_appended_when_present(self):
+        description = papi.build_sitting_description(
+            'Seduta', 'Title', 1, self._DATE, 'MOZZJONIJIET\n- Xi Haga')
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', description)
+
+    def test_agenda_omitted_when_none(self):
+        description = papi.build_sitting_description('Seduta', 'Title', 1, self._DATE, None)
+        self.assertNotIn('Aġenda', description)
 
 
 class TestPathToMtUrl(unittest.TestCase):
