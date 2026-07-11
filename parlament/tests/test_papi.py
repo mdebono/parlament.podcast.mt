@@ -2,6 +2,8 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
+import pytz
+
 from parlament import papi
 
 # ---------------------------------------------------------------------------
@@ -177,7 +179,58 @@ _PACKED_ROW_HTML = '''
 '''.encode('utf-8')
 
 
+# Committee meeting pages render the agenda as plain (non-bold) <p>
+# elements with no table at all - captured from a live House Business
+# Committee page (HBC 002, 07-Jul-2026).
+_COMMITTEE_AGENDA_HTML = '''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+    <div class="row">
+        <div class="col-md-12 container">
+            <p>1. Confirmation of Minutes;</p>
+            <p>2. House Business; and</p>
+            <p>3. Other Matters</p>
+        </div>
+    </div>
+</div>
+</body></html>
+'''.encode('utf-8')
+
+# The Maltese version of the same committee page (HBC 002) packs all three
+# items into a single <p> separated by <br /> instead of three separate
+# <p> elements - captured live after a production episode's agenda came
+# through as one run-on line with no separators at all.
+_COMMITTEE_AGENDA_HTML_BR_PACKED = '''
+<html><head><meta charset="utf-8" /></head><body>
+<div class="panel-body" id="orders">
+    <div class="row">
+        <div class="col-md-12 container">
+            <p>1. Konferma tal-Minuti;<br />2. Xogħol tal-Kamra; u<br />3. Affarijiet oħra</p>
+        </div>
+    </div>
+</div>
+</body></html>
+'''.encode('utf-8')
+
+
 class TestParseAgendaHtml(unittest.TestCase):
+
+    def test_parses_committee_plain_paragraph_items(self):
+        agenda = papi.parse_agenda_html(_COMMITTEE_AGENDA_HTML)
+        self.assertEqual(agenda,
+            '- 1. Confirmation of Minutes;\n'
+            '- 2. House Business; and\n'
+            '- 3. Other Matters')
+
+    def test_parses_br_packed_committee_items(self):
+        # Items enumerated "1. Foo;<br />2. Bar; u<br />3. Baz" inside a
+        # single <p> - a real production episode's agenda came through as
+        # one run-on line with no separator at all before this was fixed.
+        agenda = papi.parse_agenda_html(_COMMITTEE_AGENDA_HTML_BR_PACKED)
+        self.assertEqual(agenda,
+            '- 1. Konferma tal-Minuti;\n'
+            '- 2. Xogħol tal-Kamra; u\n'
+            '- 3. Affarijiet oħra')
 
     def test_parses_headings_and_items(self):
         agenda = papi.parse_agenda_html(_AGENDA_HTML)
@@ -203,6 +256,24 @@ class TestParseAgendaHtml(unittest.TestCase):
             "- Elezzjoni ta' Deputy Speaker.\n"
             "- L-Onorevoli Membri jieħdu l-Ġurament.\n"
             '- Il-Kamra tiġi aġġornata.')
+
+    def test_stray_plain_paragraph_ignored_on_table_based_page(self):
+        # A plenary-style page (has a table) with an incidental non-bold
+        # <p> outside the table - must be ignored, not treated as a
+        # committee-style agenda item.
+        html = '''
+        <html><head><meta charset="utf-8" /></head><body>
+        <div id="orders">
+            <p>This session was rescheduled from last week.</p>
+            <p style="font-weight:bold">ORDNIJIET TAL-ĠURNATA</p>
+            <table><tr><td>Abbozz Nru 5 - Xi Haga</td></tr></table>
+        </div>
+        </body></html>
+        '''.encode('utf-8')
+        agenda = papi.parse_agenda_html(html)
+        self.assertEqual(agenda,
+            'ORDNIJIET TAL-ĠURNATA\n'
+            '- Abbozz Nru 5 - Xi Haga')
 
 
 class TestGetSittingUrlMt(unittest.TestCase):
@@ -231,7 +302,7 @@ def _page_response(content, status_code=200):
     return r
 
 
-class TestGetEpisodeDescription(unittest.TestCase):
+class TestGetEpisodeTexts(unittest.TestCase):
 
     _LEG = {'TitleMT': 'Il-Hmistax-il Legislatura', 'Number': 15}
 
@@ -239,24 +310,141 @@ class TestGetEpisodeDescription(unittest.TestCase):
         return _make_sitting(1, '2025-06-30T16:00:00')
 
     @patch('parlament.papi.cache.httpGet', return_value=_page_response(_AGENDA_HTML))
-    def test_description_includes_agenda(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertIn('Il-Hmistax-il Legislatura Seduta Nru: 001', description)
-        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n', description)
-        self.assertIn('- Mozzjoni Nru 15 - Xi Haga', description)
+    def test_texts_include_agenda(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertIn('Il-Hmistax-il Legislatura Seduta Nru: 001', summary)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n', summary)
+        self.assertIn('- Mozzjoni Nru 15 - Xi Haga', summary)
+        self.assertIn('<p>Il-Hmistax-il Legislatura Seduta Nru: 001', html)
+        self.assertIn('<p><strong>Aġenda:</strong></p>', html)
+        self.assertIn('<p><strong>MOZZJONIJIET</strong></p>', html)
+        self.assertIn('<li>Mozzjoni Nru 15 - Xi Haga</li>', html)
         mock_get.assert_called_once_with(papi.PARLAMENT_URL + '/mt/test', referer=papi.PARLAMENT_URL)
 
     @patch('parlament.papi.cache.httpGet', return_value=_page_response(_NO_AGENDA_HTML))
-    def test_description_without_agenda_unchanged(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertNotIn('Aġenda', description)
-        self.assertTrue(description.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+    def test_texts_without_agenda_unchanged(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
+        self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+        self.assertEqual(html, '<p>' + summary + '</p>')
 
     @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
-    def test_description_survives_fetch_failure(self, mock_get):
-        description = papi.get_episode_description(self._LEG, self._sitting())
-        self.assertNotIn('Aġenda', description)
-        self.assertIn('Seduta Nru: 001', description)
+    def test_texts_survive_fetch_failure(self, mock_get):
+        html, summary = papi.get_episode_texts(self._LEG, self._sitting())
+        self.assertNotIn('Aġenda', summary)
+        self.assertIn('Seduta Nru: 001', summary)
+
+
+_AGENDA_LINES = [('heading', 'MOZZJONIJIET'), ('item', 'Xi Haga')]
+
+
+class TestLinesToHtml(unittest.TestCase):
+
+    def test_numbered_items_become_ordered_list_with_number_stripped(self):
+        lines = [('item', '1. Confirmation of Minutes;'),
+                 ('item', '2. House Business; and'),
+                 ('item', '3. Other Matters')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ol><li>Confirmation of Minutes;</li>'
+            '<li>House Business; and</li>'
+            '<li>Other Matters</li></ol>')
+
+    def test_unnumbered_items_stay_unordered_list_text_unchanged(self):
+        lines = [('item', 'Mozzjoni Nru 15 - Xi Haga'), ('item', "Indirizz b'risposta")]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ul><li>Mozzjoni Nru 15 - Xi Haga</li>'
+            "<li>Indirizz b'risposta</li></ul>")
+
+    def test_mixed_numbered_and_unnumbered_run_stays_unordered(self):
+        # Only switch to <ol> when every item in the run is numbered - a
+        # mixed run keeps the full original text in a <ul>.
+        lines = [('item', '1. Numbered'), ('item', 'Not numbered')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ul><li>1. Numbered</li><li>Not numbered</li></ul>')
+
+    def test_numbered_items_in_separate_heading_groups_each_own_ol(self):
+        lines = [('heading', 'A'), ('item', '1. First'), ('item', '2. Second'),
+                 ('heading', 'B'), ('item', 'Plain')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<p><strong>A</strong></p><ol><li>First</li><li>Second</li></ol>'
+            '<p><strong>B</strong></p><ul><li>Plain</li></ul>')
+
+
+class TestBuildSittingTexts(unittest.TestCase):
+
+    _DATE = pytz.timezone('Europe/Malta').localize(datetime(2025, 6, 30, 16, 0))
+
+    def test_plenary_label(self):
+        html, summary = papi.build_sitting_texts(
+            'Seduta', 'Il-Hmistax-il Legislatura', 1, self._DATE, None)
+        self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
+        self.assertNotIn('Aġenda', summary)
+        self.assertEqual(html, '<p>' + summary + '</p>')
+
+    def test_committee_label(self):
+        html, summary = papi.build_sitting_texts(
+            'Laqgħa', 'Kumitat dwar il-Kontijiet Pubbliċi', 12, self._DATE, None)
+        self.assertTrue(summary.startswith('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012'))
+
+    def test_agenda_appended_when_present(self):
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
+        self.assertIn('<p><strong>Aġenda:</strong></p><p><strong>MOZZJONIJIET</strong></p><ul><li>Xi Haga</li></ul>', html)
+
+    def test_agenda_omitted_when_none(self):
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None)
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
+
+    def test_no_label_uses_plain_title_date_preamble(self):
+        # Used for events and committees without a meeting number - no
+        # meaningful "Nru:" to show, and number is ignored.
+        html, summary = papi.build_sitting_texts(None, 'Konferenza dwar X', None, self._DATE, None)
+        self.assertTrue(summary.startswith('Konferenza dwar X - '))
+        self.assertNotIn('Nru:', summary)
+        self.assertEqual(html, '<p>' + summary + '</p>')
+
+    def test_no_label_still_appends_agenda(self):
+        html, summary = papi.build_sitting_texts(None, 'Title', None, self._DATE, _AGENDA_LINES)
+        self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
+        self.assertIn('<p><strong>Aġenda:</strong></p>', html)
+
+    def test_title_html_escaped_but_summary_stays_plain(self):
+        html, summary = papi.build_sitting_texts('Seduta', 'R&D <Committee>', 1, self._DATE, None)
+        self.assertIn('R&D <Committee>', summary)
+        self.assertIn('R&amp;D &lt;Committee&gt;', html)
+        self.assertNotIn('<Committee>', html)
+
+    def test_agenda_text_html_escaped_but_summary_stays_plain(self):
+        lines = [('heading', 'A & B'), ('item', 'Bill <2024>')]
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, lines)
+        self.assertIn('A & B', summary)
+        self.assertIn('Bill <2024>', summary)
+        self.assertIn('A &amp; B', html)
+        self.assertIn('Bill &lt;2024&gt;', html)
+
+
+class TestLabelAndTitleForSitting(unittest.TestCase):
+
+    _LEG = {'TitleMT': 'Il-Hmistax-il Legislatura', 'Number': 15}
+
+    def test_plenary_uses_legislature_title(self):
+        sitting = _make_sitting(171, '2023-11-14T16:00:00')
+        label, title = papi.label_and_title_for_sitting('plenary', self._LEG, sitting)
+        self.assertEqual(label, 'Seduta')
+        self.assertEqual(title, 'Il-Hmistax-il Legislatura')
+
+    def test_committee_uses_sitting_title(self):
+        sitting = _make_sitting(12, '2026-07-01T14:30:00')
+        sitting['Title'] = 'Kumitat dwar il-Kontijiet Pubbliċi'
+        label, title = papi.label_and_title_for_sitting('committee', self._LEG, sitting)
+        self.assertEqual(label, 'Laqgħa')
+        self.assertEqual(title, 'Kumitat dwar il-Kontijiet Pubbliċi')
+
+    def test_unknown_kind_returns_none(self):
+        sitting = _make_sitting(1, '2023-01-01T10:00:00')
+        self.assertEqual(papi.label_and_title_for_sitting('event', self._LEG, sitting), (None, None))
 
 
 class TestPathToMtUrl(unittest.TestCase):
@@ -270,18 +458,18 @@ class TestPathToMtUrl(unittest.TestCase):
                          papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
 
 
-class TestGetAgendaByUrl(unittest.TestCase):
+class TestGetAgendaLinesByUrl(unittest.TestCase):
 
     @patch('parlament.papi.cache.httpGet', return_value=_page_response(_AGENDA_HTML))
-    def test_returns_agenda(self, mock_get):
-        agenda = papi.get_agenda_by_url('https://parlament.mt/mt/test')
-        self.assertIn('MOZZJONIJIET', agenda)
+    def test_returns_agenda_lines(self, mock_get):
+        lines = papi.get_agenda_lines_by_url('https://parlament.mt/mt/test')
+        self.assertIn(('heading', 'MOZZJONIJIET'), lines)
         mock_get.assert_called_once_with('https://parlament.mt/mt/test',
                                          referer=papi.PARLAMENT_URL)
 
     @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
     def test_fetch_failure_returns_none(self, mock_get):
-        self.assertIsNone(papi.get_agenda_by_url('https://parlament.mt/mt/test'))
+        self.assertIsNone(papi.get_agenda_lines_by_url('https://parlament.mt/mt/test'))
 
 
 class TestGetPlenaryCandidates(unittest.TestCase):
@@ -318,8 +506,9 @@ class TestGetPlenaryCandidates(unittest.TestCase):
         sitting = self._sitting_with_audio(171, '2023-11-14T16:00:00', _RIGHT_URL)
         [candidate] = papi.get_plenary_candidates(self._LEG, [sitting])
         mock_get.assert_not_called()
-        description = candidate['build_description']()
-        self.assertIn('Seduta Nru: 171', description)
+        html, summary = candidate['build_texts']()
+        self.assertIn('Seduta Nru: 171', summary)
+        self.assertIn('Seduta Nru: 171', html)
         mock_get.assert_called_once()
 
 

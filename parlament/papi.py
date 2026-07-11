@@ -1,6 +1,7 @@
 # Parlament API
 
 from datetime import datetime
+from html import escape as html_escape
 import re
 import pytz, babel.dates
 import lxml.html
@@ -147,6 +148,37 @@ def correct_audio_url(sitting, audio_url):
 
 _SENTENCE_END_RE = re.compile(r'[.!?:]\s*$')
 
+def _split_on_br(el):
+    """Split an element's content into one line per <br>-separated segment,
+    every <br> starting a new line unconditionally. Used for committee
+    agenda items, which are commonly packed into a single <p> as
+    "1. Foo;<br />2. Bar; u<br />3. Baz" rather than separate <p> elements
+    - text_content() would otherwise silently run them together with no
+    separator at all, since <br> contributes no text of its own. Unlike
+    _split_row_into_lines, there's no sentence-final-punctuation heuristic
+    here: these enumerated items typically end in ';', not '.', so that
+    heuristic would merge them right back together."""
+    lines = []
+    buf = []
+
+    def flush():
+        text = ' '.join(''.join(buf).split())
+        buf.clear()
+        if text:
+            lines.append(text)
+
+    if el.text:
+        buf.append(el.text)
+    for child in el:
+        if child.tag == 'br':
+            flush()
+        else:
+            buf.append(child.text_content())
+        if child.tail:
+            buf.append(child.tail)
+    flush()
+    return lines
+
 def _split_row_into_lines(el):
     """Split a <tr>'s content into text lines, breaking at <p> and <br>
     boundaries. Most rows are a single line, but some (e.g. the opening
@@ -186,58 +218,158 @@ def _split_row_into_lines(el):
     flush()
     return lines
 
-def parse_agenda_html(html):
-    """Extract the agenda from a sitting page as plain-text lines, or None.
+def _extract_agenda_lines(html):
+    """Extract the agenda from a sitting/meeting page as structured
+    ('heading'|'item', text) lines, or None. The page renders the agenda
+    inside <div id="orders">, but its inner markup differs by page type:
 
-    The sitting page renders the agenda inside <div id="orders">: bold <p>
-    elements are section headings (e.g. ORDNIJIET TAL-ĠURNATA) and each table
-    row is one or more agenda items."""
+    - plenary sitting pages: bold <p> elements are section headings (e.g.
+      ORDNIJIET TAL-ĠURNATA) and each table row is one or more agenda items.
+      Non-bold <p> elements are incidental text (notes, captions) and are
+      not treated as agenda items on these pages.
+    - committee meeting pages: agenda items are plain (non-bold) <p>
+      elements with no table at all.
+
+    A page is classified as table-based (plenary-style) the moment any
+    <table> appears anywhere in #orders, so a stray non-bold <p> on such a
+    page is never mistaken for a committee-style agenda item.
+
+    Table-nested <p> elements are excluded here because their text is
+    already extracted via the <tr> branch below."""
     doc = lxml.html.fromstring(html)
     orders = doc.xpath('//div[@id="orders"]')
     if not orders:
         return None
+    has_table = bool(orders[0].xpath('.//table'))
     lines = []
     for el in orders[0].iter():
-        if (el.tag == 'p' and 'bold' in (el.get('style') or '')
-                and not any(a.tag == 'table' for a in el.iterancestors())):
-            text = ' '.join(el.text_content().split())
-            if text:
-                lines.append(text)
+        if el.tag == 'p' and not any(a.tag == 'table' for a in el.iterancestors()):
+            if 'bold' in (el.get('style') or ''):
+                text = ' '.join(el.text_content().split())
+                if text:
+                    lines.append(('heading', text))
+            elif not has_table:
+                for line in _split_on_br(el):
+                    lines.append(('item', line))
         elif el.tag == 'tr':
             for line in _split_row_into_lines(el):
-                lines.append('- ' + line)
+                lines.append(('item', line))
     if not lines:
         return None
-    return '\n'.join(lines)
+    return lines
 
-def get_agenda_by_url(url):
-    """Fetch a sitting/meeting page and return its agenda as plain text, or
-    None if the page or the agenda section is unavailable."""
+def lines_to_plain(lines):
+    """Render structured agenda lines as plain text: headings raw, items
+    prefixed '- ', one per line."""
+    return '\n'.join(text if kind == 'heading' else '- ' + text for kind, text in lines)
+
+_NUMBERED_ITEM_RE = re.compile(r'^\d+\.\s*')
+
+def lines_to_html(lines):
+    """Render structured agenda lines as HTML: each heading becomes a bold
+    paragraph, and each run of consecutive items becomes one list block.
+    If every item in a run is itself numbered ("1. Foo;"), it's rendered
+    as <ol> with the redundant leading number stripped (the <ol> already
+    supplies it); otherwise <ul>, text unchanged. Text is HTML-escaped
+    since it's sourced from the parliament site and may itself contain
+    '<' or '&'."""
+    parts = []
+    items = []
+
+    def flush_items():
+        if not items:
+            return
+        if all(_NUMBERED_ITEM_RE.match(text) for text in items):
+            tag, rendered = 'ol', [_NUMBERED_ITEM_RE.sub('', text, count=1) for text in items]
+        else:
+            tag, rendered = 'ul', items
+        parts.append('<{tag}>'.format(tag=tag)
+                     + ''.join('<li>{}</li>'.format(html_escape(text, quote=False)) for text in rendered)
+                     + '</{tag}>'.format(tag=tag))
+        items.clear()
+
+    for kind, text in lines:
+        if kind == 'heading':
+            flush_items()
+            parts.append('<p><strong>{}</strong></p>'.format(html_escape(text, quote=False)))
+        else:
+            items.append(text)
+    flush_items()
+    return ''.join(parts)
+
+def parse_agenda_html(html):
+    """Extract the agenda from a sitting/meeting page as plain text, or
+    None if the page or the agenda section is unavailable. A convenience
+    composition of _extract_agenda_lines + lines_to_plain kept as a public,
+    network-free utility (and the main test surface for the DOM-parsing
+    rules); the live fetch path goes through get_agenda_lines_by_url
+    instead, since it needs the structured form to also render HTML."""
+    lines = _extract_agenda_lines(html)
+    return lines_to_plain(lines) if lines else None
+
+def get_agenda_lines_by_url(url):
+    """Fetch a sitting/meeting page and return its agenda as structured
+    lines, or None if the page or the agenda section is unavailable."""
     try:
         response = cache.httpGet(url, referer=PARLAMENT_URL)
         response.raise_for_status()
-        return parse_agenda_html(response.content)
+        return _extract_agenda_lines(response.content)
     except Exception as e:
         print('Warning: could not fetch agenda from {}: {}'.format(url, e))
         return None
 
-def get_sitting_agenda(sitting):
-    """Fetch the sitting page and return its agenda as plain text, or None if
-    the page or the agenda section is unavailable."""
-    return get_agenda_by_url(get_sitting_url_mt(sitting))
+def get_sitting_agenda_lines(sitting):
+    """Fetch the sitting page and return its agenda as structured lines, or
+    None if the page or the agenda section is unavailable."""
+    return get_agenda_lines_by_url(get_sitting_url_mt(sitting))
 
-def get_episode_description(leg, sitting):
-    text = '{leg_title} Seduta Nru: {episode:03} - {date}'
-    date = get_sitting_date(sitting)
-    description = text.format(
-        leg_title = get_leg_title(leg),
-        episode = get_sitting_number(sitting),
-        date = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt'),
+def build_sitting_texts(label, title, number, date, lines):
+    """Build (description_html, summary) for an episode. label is 'Seduta'
+    (plenary), 'Laqgħa' (committee), or None for a meeting with no
+    meaningful number to show (events, committees without one) - in which
+    case the preamble is just "title - date" and number is ignored.
+    lines is the already-fetched structured agenda (from
+    get_agenda_lines_by_url, or None) - callers control the one fetch this
+    needs, and both text forms are built from the same source of truth so
+    they can never drift apart."""
+    date_str = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt')
+    if label:
+        preamble = '{title} {label} Nru: {number:03} - {date}'.format(
+            title=title, label=label, number=number, date=date_str)
+    else:
+        preamble = '{title} - {date}'.format(title=title, date=date_str)
+    summary = preamble
+    html = '<p>{}</p>'.format(html_escape(preamble, quote=False))
+    if lines:
+        summary += '\n\nAġenda:\n' + lines_to_plain(lines)
+        html += '<p><strong>Aġenda:</strong></p>' + lines_to_html(lines)
+    return html, summary
+
+def label_and_title_for_sitting(kind, leg, sitting):
+    """Return (label, title) for building a sitting's description text -
+    the single source of truth for how each kind is labelled and whose
+    title it uses, shared by the live plenary path and the archive-backed
+    backfill path (both operate on the same sitting dict shape). Plenary's
+    canonical subject is the legislature's own title; committees use their
+    own sitting title. Returns (None, None) for a kind the archive has no
+    equivalent for (e.g. 'event')."""
+    if kind == 'plenary':
+        return 'Seduta', get_leg_title(leg)
+    elif kind == 'committee':
+        return 'Laqgħa', get_sitting_title(sitting)
+    else:
+        return None, None
+
+def get_episode_texts(leg, sitting):
+    """Return (description_html, summary) for a plenary sitting."""
+    label, title = label_and_title_for_sitting('plenary', leg, sitting)
+    return build_sitting_texts(
+        label,
+        title,
+        get_sitting_number(sitting),
+        get_sitting_date(sitting),
+        get_sitting_agenda_lines(sitting),
     )
-    agenda = get_sitting_agenda(sitting)
-    if agenda:
-        description += '\n\nAġenda:\n' + agenda
-    return description
 
 def get_plenary_candidates(leg, sittings):
     """Build candidate dicts (see app.py) for plenary sittings from the media
@@ -258,7 +390,7 @@ def get_plenary_candidates(leg, sittings):
             'link': get_sitting_url(sitting),
             'pubdate': get_sitting_date(sitting),
             'source': 'media-archive',
-            'build_description':
-                lambda leg=leg, sitting=sitting: get_episode_description(leg, sitting),
+            'build_texts':
+                lambda leg=leg, sitting=sitting: get_episode_texts(leg, sitting),
         })
     return candidates

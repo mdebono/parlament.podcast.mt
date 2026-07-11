@@ -1,3 +1,4 @@
+import io
 import unittest
 from datetime import datetime, timezone
 
@@ -71,6 +72,72 @@ class TestParlamentFeed(unittest.TestCase):
         self.assertIsNotNone(item['unique_id'],
             "Each feed item must have a unique_id (GUID) so podcast apps can track episodes")
         self.assertEqual(item['unique_id'], audio_url)
+
+    def test_add_item_summary_present(self):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='<p>A test episode</p>',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            summary='A test episode',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        self.assertEqual(feed.items[0]['summary'], 'A test episode')
+
+    def test_add_item_summary_defaults_to_none(self):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='A test episode',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        self.assertIsNone(feed.items[0]['summary'])
+
+    def test_itunes_summary_emitted_when_present(self):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='<p>A test episode</p>',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            summary='A test episode',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        out = io.StringIO()
+        feed.write(out, 'utf8')
+        self.assertIn('<itunes:summary>A test episode</itunes:summary>', out.getvalue())
+
+    def test_itunes_summary_emitted_even_when_empty_string(self):
+        # An empty summary is a data problem worth surfacing, not silently
+        # dropping - distinguish it from summary genuinely absent (None).
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='<p>A test episode</p>',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            summary='',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        out = io.StringIO()
+        feed.write(out, 'utf8')
+        self.assertIn('<itunes:summary/>', out.getvalue())
+
+    def test_itunes_summary_omitted_when_absent(self):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description='A test episode',
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        out = io.StringIO()
+        feed.write(out, 'utf8')
+        self.assertNotIn('itunes:summary', out.getvalue())
 
     def test_add_item_explicit_unique_id(self):
         feed = pfeed.init_feed()

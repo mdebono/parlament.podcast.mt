@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 import sys
 
 from parlament import papi, latest, pfeed, mirror, catalog
@@ -11,14 +12,17 @@ from parlament import papi, latest, pfeed, mirror, catalog
 #   link               absolute URL of the sitting/meeting page
 #   pubdate            aware datetime
 #   source             'media-archive' | 'latest-media'
-#   build_description  zero-arg callable; only invoked for new episodes so
-#                      agenda pages are not re-fetched on every run
+#   build_texts        zero-arg callable returning (description, summary);
+#                      only invoked for new episodes so agenda pages are
+#                      not re-fetched on every run
 
 ARCHIVE_SITTING_LIMIT = 20
 
 def gather_candidates():
     """Collect candidates from both sources. Either source may fail without
-    taking down the run; the catalogue still republishes everything known."""
+    taking down the run; the catalogue still republishes everything known.
+    Returns (leg, candidates); leg is None if the media-archive fetch
+    itself failed (used both for plenary candidates and for backfilling)."""
     leg = None
     candidates = []
     try:
@@ -35,7 +39,7 @@ def gather_candidates():
     except Exception as e:
         print(f'Warning: latest-media source failed: {e}', file=sys.stderr)
 
-    return candidates
+    return leg, candidates
 
 def ingest(store, candidates):
     """Merge candidates into the catalogue, mirroring audio for new ones.
@@ -62,9 +66,50 @@ def ingest(store, candidates):
             print(f'Error mirroring {audio_url} to R2: {e}', file=sys.stderr)
             continue
         content_length = mirror.get_r2_content_length(key)
-        description = candidate['build_description']()
-        entry = catalog.make_entry(candidate, r2_url, content_length, description)
+        description, summary = candidate['build_texts']()
+        entry = catalog.make_entry(candidate, r2_url, content_length, description, summary)
         catalog.add_episode(store, key, entry)
+
+def archive_sitting_index(leg):
+    """Map every episode_key reachable from the media archive - across all
+    CommitteeTypes, not just Plenary - to its sitting dict. The archive
+    holds the full history for every committee, so this lets already
+    catalogued episodes be re-matched and re-described even long after
+    they've rolled off the homepage widget's 20-item window."""
+    index = {}
+    for committee in leg.get('Committees', []):
+        for sitting in committee.get('Sittings', []):
+            try:
+                audio_path = papi.get_bare_audio_url(sitting)
+            except Exception:
+                continue
+            key = catalog.episode_key({'source_audio_path': audio_path})
+            index[key] = sitting
+    return index
+
+def backfill_descriptions(store, leg):
+    """Rebuild the description/summary of every catalogued episode the
+    archive can still account for, using the current formatting logic.
+    Guid, title, link, pubdate, kind and sources are never touched - only
+    these two text fields are refreshed. Entries the archive has no
+    equivalent for (kind='event', or a committee meeting it no longer
+    carries) are left untouched."""
+    index = archive_sitting_index(leg)
+    for key, entry in store['episodes'].items():
+        sitting = index.get(key)
+        if sitting is None:
+            continue
+        label, title = papi.label_and_title_for_sitting(entry['kind'], leg, sitting)
+        if label is None:
+            continue
+        description, summary = papi.build_sitting_texts(
+            label,
+            title,
+            papi.get_sitting_number(sitting),
+            papi.get_sitting_date(sitting),
+            papi.get_sitting_agenda_lines(sitting),
+        )
+        catalog.update_texts(entry, description, summary)
 
 def build_feed(store):
     feed = pfeed.init_feed()
@@ -77,6 +122,7 @@ def build_feed(store):
             content_length=entry['content_length'],
             pubdate=datetime.fromisoformat(entry['pubdate']),
             unique_id=entry['guid'],
+            summary=entry.get('summary'),
         )
     return feed
 
@@ -84,11 +130,17 @@ def run():
     store = catalog.load_catalog()
     previous_count = len(store['episodes'])
 
-    candidates = gather_candidates()
+    leg, candidates = gather_candidates()
     if not candidates and previous_count == 0:
         raise RuntimeError('no sources available and catalogue is empty; nothing to publish')
 
     ingest(store, candidates)
+
+    if os.environ.get('FORCE_BACKFILL') == 'true':
+        if leg is not None:
+            backfill_descriptions(store, leg)
+        else:
+            print('Warning: cannot backfill without media-archive data', file=sys.stderr)
 
     # The catalogue write is the durable commit point: it happens after all
     # mirroring, so every entry has its mp3 in R2, and before the feed write,
