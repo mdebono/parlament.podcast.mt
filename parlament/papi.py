@@ -64,18 +64,21 @@ def get_audio_content_length(audio_url):
 def get_sitting_url(sitting):
     return PARLAMENT_URL + sitting['Url']
 
-def get_sitting_url_mt(sitting):
-    """Return the Maltese-language URL of the sitting page.
+def path_to_mt_url(path):
+    """Return the Maltese-language URL for a site path.
 
     The API returns language-neutral paths (e.g. /15th-leg/plenary-session/...)
     which the site renders in English by default; the Maltese version lives
     under the /mt/ prefix."""
-    url = sitting['Url']
-    if url.startswith('/en/'):
-        url = url[3:]
-    if not url.startswith('/mt/'):
-        url = '/mt' + url
-    return PARLAMENT_URL + url
+    if path.startswith('/en/'):
+        path = path[3:]
+    if not path.startswith('/mt/'):
+        path = '/mt' + path
+    return PARLAMENT_URL + path
+
+def get_sitting_url_mt(sitting):
+    """Return the Maltese-language URL of the sitting page."""
+    return path_to_mt_url(sitting['Url'])
 
 def get_sitting_title(sitting):
     return sitting['Title']
@@ -207,17 +210,21 @@ def parse_agenda_html(html):
         return None
     return '\n'.join(lines)
 
-def get_sitting_agenda(sitting):
-    """Fetch the sitting page and return its agenda as plain text, or None if
-    the page or the agenda section is unavailable."""
-    url = get_sitting_url_mt(sitting)
+def get_agenda_by_url(url):
+    """Fetch a sitting/meeting page and return its agenda as plain text, or
+    None if the page or the agenda section is unavailable."""
     try:
         response = cache.httpGet(url, referer=PARLAMENT_URL)
         response.raise_for_status()
         return parse_agenda_html(response.content)
     except Exception as e:
-        print('Warning: could not fetch agenda for sitting {}: {}'.format(get_sitting_number(sitting), e))
+        print('Warning: could not fetch agenda from {}: {}'.format(url, e))
         return None
+
+def get_sitting_agenda(sitting):
+    """Fetch the sitting page and return its agenda as plain text, or None if
+    the page or the agenda section is unavailable."""
+    return get_agenda_by_url(get_sitting_url_mt(sitting))
 
 def get_episode_description(leg, sitting):
     text = '{leg_title} Seduta Nru: {episode:03} - {date}'
@@ -231,3 +238,27 @@ def get_episode_description(leg, sitting):
     if agenda:
         description += '\n\nAġenda:\n' + agenda
     return description
+
+def get_plenary_candidates(leg, sittings):
+    """Build candidate dicts (see app.py) for plenary sittings from the media
+    archive. Sittings without usable audio are skipped with a warning.
+    Descriptions are built lazily so the agenda page is only fetched for
+    sittings that are new to the catalogue."""
+    candidates = []
+    for sitting in sittings:
+        try:
+            audio_path = get_bare_audio_url(sitting)
+        except Exception as e:
+            print('Warning: skipping sitting {}: {}'.format(get_sitting_number(sitting), e))
+            continue
+        candidates.append({
+            'source_audio_path': audio_path,
+            'kind': 'plenary',
+            'title': get_episode_title(leg, sitting),
+            'link': get_sitting_url(sitting),
+            'pubdate': get_sitting_date(sitting),
+            'source': 'media-archive',
+            'build_description':
+                lambda leg=leg, sitting=sitting: get_episode_description(leg, sitting),
+        })
+    return candidates
