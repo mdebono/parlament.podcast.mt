@@ -77,6 +77,19 @@ class _FileDownloadMeta:
                 '{} Server Error for url: {}'.format(self.status_code, self.url)
             )
 
+def _send_with_retry(send, description):
+    """Call *send* (a zero-arg request-issuing callable) and retry with
+    backoff if the response status looks like a transient WAF block."""
+    response = send()
+    for delay in RETRY_BACKOFF_SECONDS:
+        if response.status_code not in RETRY_STATUS_CODES:
+            break
+        print('Warning: {} returned HTTP {}, retrying in {}s'.format(
+            description, response.status_code, delay))
+        time.sleep(delay)
+        response = send()
+    return response
+
 def read_cache():
     print('reading cache')
     if Path(CACHE_PATH).exists():
@@ -118,14 +131,10 @@ def httpGet(url, referer=None):
         }
         if referer:
             headers['Referer'] = referer
-        response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
-        for delay in RETRY_BACKOFF_SECONDS:
-            if response.status_code not in RETRY_STATUS_CODES:
-                break
-            print('Warning: GET {} returned HTTP {}, retrying in {}s'.format(
-                url, response.status_code, delay))
-            time.sleep(delay)
-            response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        response = _send_with_retry(
+            lambda: _session.get(url, headers=headers, timeout=HTTP_TIMEOUT),
+            'GET {}'.format(url),
+        )
         cache[key] = _to_cached(response)
         print('GET added to cache: {}'.format(url))
         write_cache()
@@ -173,7 +182,10 @@ def httpPost(url, payload, referer=None):
         }
         if referer:
             headers['Referer'] = referer
-        response = _session.post(url, data=payload, headers=headers, timeout=HTTP_TIMEOUT)
+        response = _send_with_retry(
+            lambda: _session.post(url, data=payload, headers=headers, timeout=HTTP_TIMEOUT),
+            'POST {} with POST {}'.format(url, payload),
+        )
         cache[key] = _to_cached(response)
         print('POST added to cache: {} with POST {}'.format(url, payload))
         write_cache()
