@@ -7,6 +7,10 @@ cache.pkl
 *.rss.tmp
 *.mp3
 data/
+models/
+*-metadata.json
+kaggle.json
+kaggle_upload/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
