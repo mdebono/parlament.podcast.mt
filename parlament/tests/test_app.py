@@ -274,7 +274,7 @@ class TestRun(unittest.TestCase):
 
         after = store['episodes'][pac_key]
         self.assertIn('Aġenda', after['description'])
-        self.assertIn('<li>1. Confirmation of Minutes;</li>', after['description'])
+        self.assertIn('<ol><li>Confirmation of Minutes;</li>', after['description'])
         self.assertIn('Aġenda', after['summary'])
         self.assertIn('- 1. Confirmation of Minutes;', after['summary'])
         self.assertNotIn('<', after['summary'])

@@ -263,18 +263,30 @@ def lines_to_plain(lines):
     prefixed '- ', one per line."""
     return '\n'.join(text if kind == 'heading' else '- ' + text for kind, text in lines)
 
+_NUMBERED_ITEM_RE = re.compile(r'^\d+\.\s*')
+
 def lines_to_html(lines):
     """Render structured agenda lines as HTML: each heading becomes a bold
-    paragraph, and each run of consecutive items becomes one <ul><li>...
-    </li></ul> block. Text is HTML-escaped since it's sourced from the
-    parliament site and may itself contain '<' or '&'."""
+    paragraph, and each run of consecutive items becomes one list block.
+    If every item in a run is itself numbered ("1. Foo;"), it's rendered
+    as <ol> with the redundant leading number stripped (the <ol> already
+    supplies it); otherwise <ul>, text unchanged. Text is HTML-escaped
+    since it's sourced from the parliament site and may itself contain
+    '<' or '&'."""
     parts = []
     items = []
 
     def flush_items():
-        if items:
-            parts.append('<ul>' + ''.join('<li>{}</li>'.format(html_escape(text, quote=False)) for text in items) + '</ul>')
-            items.clear()
+        if not items:
+            return
+        if all(_NUMBERED_ITEM_RE.match(text) for text in items):
+            tag, rendered = 'ol', [_NUMBERED_ITEM_RE.sub('', text, count=1) for text in items]
+        else:
+            tag, rendered = 'ul', items
+        parts.append('<{tag}>'.format(tag=tag)
+                     + ''.join('<li>{}</li>'.format(html_escape(text, quote=False)) for text in rendered)
+                     + '</{tag}>'.format(tag=tag))
+        items.clear()
 
     for kind, text in lines:
         if kind == 'heading':

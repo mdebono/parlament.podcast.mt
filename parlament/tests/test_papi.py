@@ -339,6 +339,38 @@ class TestGetEpisodeTexts(unittest.TestCase):
 _AGENDA_LINES = [('heading', 'MOZZJONIJIET'), ('item', 'Xi Haga')]
 
 
+class TestLinesToHtml(unittest.TestCase):
+
+    def test_numbered_items_become_ordered_list_with_number_stripped(self):
+        lines = [('item', '1. Confirmation of Minutes;'),
+                 ('item', '2. House Business; and'),
+                 ('item', '3. Other Matters')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ol><li>Confirmation of Minutes;</li>'
+            '<li>House Business; and</li>'
+            '<li>Other Matters</li></ol>')
+
+    def test_unnumbered_items_stay_unordered_list_text_unchanged(self):
+        lines = [('item', 'Mozzjoni Nru 15 - Xi Haga'), ('item', "Indirizz b'risposta")]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ul><li>Mozzjoni Nru 15 - Xi Haga</li>'
+            "<li>Indirizz b'risposta</li></ul>")
+
+    def test_mixed_numbered_and_unnumbered_run_stays_unordered(self):
+        # Only switch to <ol> when every item in the run is numbered - a
+        # mixed run keeps the full original text in a <ul>.
+        lines = [('item', '1. Numbered'), ('item', 'Not numbered')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<ul><li>1. Numbered</li><li>Not numbered</li></ul>')
+
+    def test_numbered_items_in_separate_heading_groups_each_own_ol(self):
+        lines = [('heading', 'A'), ('item', '1. First'), ('item', '2. Second'),
+                 ('heading', 'B'), ('item', 'Plain')]
+        self.assertEqual(papi.lines_to_html(lines),
+            '<p><strong>A</strong></p><ol><li>First</li><li>Second</li></ol>'
+            '<p><strong>B</strong></p><ul><li>Plain</li></ul>')
+
+
 class TestBuildSittingTexts(unittest.TestCase):
 
     _DATE = pytz.timezone('Europe/Malta').localize(datetime(2025, 6, 30, 16, 0))
