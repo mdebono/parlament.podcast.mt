@@ -32,12 +32,25 @@ def add_item(feed, title, description, link, audio_url, content_length='', durat
         summary=summary,
     )
 
+def _wrap_descriptions_in_cdata(tree):
+    """Wrap each item's <description> in a CDATA section instead of
+    entity-escaping it. Both are XML-equivalent - any conformant parser
+    decodes them to the same string - but CDATA is the conventional way
+    podcast RSS feeds carry HTML-bearing fields and keeps the raw feed
+    source human-readable. Left entity-escaped (skipped) in the
+    vanishingly unlikely case the text contains a literal ']]>', which
+    would prematurely close a CDATA section."""
+    for description in tree.findall('.//item/description'):
+        if description.text and ']]>' not in description.text:
+            description.text = etree.CDATA(description.text)
+
 def write_feed(feed, filename):
     tmp_filename = filename + '.tmp'
     try:
         with open(tmp_filename, 'w', encoding=UTF8) as fp:
             feed.write(fp, UTF8)
         tree = etree.parse(tmp_filename)
+        _wrap_descriptions_in_cdata(tree)
         tree.write(filename, encoding=UTF8, pretty_print=True)
     finally:
         if os.path.exists(tmp_filename):

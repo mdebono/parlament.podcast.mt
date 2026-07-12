@@ -1,4 +1,6 @@
 import io
+import os
+import tempfile
 import unittest
 from datetime import datetime, timezone
 
@@ -152,6 +154,52 @@ class TestParlamentFeed(unittest.TestCase):
         self.assertEqual(feed.items[0]['unique_id'],
             'https://r2.parlament.podcast.mt/Audio/original guid.mp3',
             "an explicitly stored guid must win over the enclosure URL")
+
+class TestWriteFeedCdata(unittest.TestCase):
+
+    def _write(self, description, summary=None):
+        feed = pfeed.init_feed()
+        pfeed.add_item(feed,
+            title='Test Episode',
+            description=description,
+            link='https://parlament.mt/test',
+            audio_url='https://parlament.mt/Audio/test.mp3',
+            summary=summary,
+            pubdate=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, 'podcast.rss')
+            pfeed.write_feed(feed, path)
+            return open(path, encoding='utf8').read()
+
+    def test_html_description_wrapped_in_cdata_verbatim(self):
+        # Content already carries its own entity-escaping (e.g. from
+        # html.escape() upstream) for characters from the source text -
+        # CDATA must not escape it a second time.
+        content = self._write('<p>R&amp;D &lt;Committee&gt;</p><ul><li>Item</li></ul>')
+        self.assertIn(
+            '<description><![CDATA[<p>R&amp;D &lt;Committee&gt;</p><ul><li>Item</li></ul>]]></description>',
+            content)
+
+    def test_itunes_summary_not_wrapped_in_cdata(self):
+        content = self._write('<p>desc</p>', summary='R&D <Committee>')
+        self.assertIn('<itunes:summary>R&amp;D &lt;Committee&gt;</itunes:summary>', content)
+        self.assertNotIn('<itunes:summary><![CDATA[', content)
+
+    def test_literal_cdata_close_sequence_falls_back_to_escaping(self):
+        # ']]>' inside the content would prematurely close a CDATA
+        # section - skip CDATA for that (rare) case rather than emit
+        # broken XML.
+        content = self._write('<p>weird ]]> content</p>')
+        self.assertNotIn('<![CDATA[', content)
+        self.assertIn('&lt;p&gt;weird ]]&gt; content&lt;/p&gt;', content)
+
+    def test_channel_description_untouched(self):
+        content = self._write('<p>desc</p>')
+        self.assertIn(
+            "<description>Dan il-Podcast huwa ġabra inuffiċjali", content)
+        self.assertNotIn('<![CDATA[Dan il-Podcast', content)
+
 
 if __name__ == '__main__':
     unittest.main()
