@@ -328,7 +328,9 @@ class TestGetEpisodeTexts(unittest.TestCase):
         self.assertNotIn('Aġenda', summary)
         self.assertNotIn('Aġenda', html)
         self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
-        self.assertEqual(html, '<p>' + summary + '</p>')
+        link = papi.PARLAMENT_URL + '/mt/test'
+        self.assertIn('\n\nAktar informazzjoni: ' + link, summary)
+        self.assertIn('<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(link), html)
 
     @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
     def test_texts_survive_fetch_failure(self, mock_get):
@@ -384,58 +386,79 @@ class TestLinesToHtml(unittest.TestCase):
             'ORDNIJIET TAL-ĠURNATA\nAbbozz Nru 2 - Xi Haga\nAbbozz Nru 1 - Ohra')
 
 
+_LINK = 'https://parlament.mt/mt/test-link'
+
+
 class TestBuildSittingTexts(unittest.TestCase):
 
     _DATE = pytz.timezone('Europe/Malta').localize(datetime(2025, 6, 30, 16, 0))
 
     def test_plenary_label(self):
         html, summary = papi.build_sitting_texts(
-            'Seduta', 'Il-Hmistax-il Legislatura', 1, self._DATE, None)
+            'Seduta', 'Il-Hmistax-il Legislatura', 1, self._DATE, None, _LINK)
         self.assertTrue(summary.startswith('Il-Hmistax-il Legislatura Seduta Nru: 001'))
         self.assertNotIn('Aġenda', summary)
-        self.assertEqual(html, '<p>' + summary + '</p>')
+        self.assertIn('\n\nAktar informazzjoni: ' + _LINK, summary)
+        self.assertIn('<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(_LINK), html)
 
     def test_committee_label(self):
         html, summary = papi.build_sitting_texts(
-            'Laqgħa', 'Kumitat dwar il-Kontijiet Pubbliċi', 12, self._DATE, None)
+            'Laqgħa', 'Kumitat dwar il-Kontijiet Pubbliċi', 12, self._DATE, None, _LINK)
         self.assertTrue(summary.startswith('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012'))
 
     def test_agenda_appended_when_present(self):
-        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES)
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES, _LINK)
         self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
         self.assertIn('<p><strong>Aġenda:</strong></p>\n<p><strong>MOZZJONIJIET</strong></p>\n<ul><li>Xi Haga</li></ul>', html)
 
     def test_agenda_omitted_when_none(self):
-        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None)
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None, _LINK)
         self.assertNotIn('Aġenda', summary)
         self.assertNotIn('Aġenda', html)
 
     def test_no_label_uses_plain_title_date_preamble(self):
         # Used for events and committees without a meeting number - no
         # meaningful "Nru:" to show, and number is ignored.
-        html, summary = papi.build_sitting_texts(None, 'Konferenza dwar X', None, self._DATE, None)
+        html, summary = papi.build_sitting_texts(None, 'Konferenza dwar X', None, self._DATE, None, _LINK)
         self.assertTrue(summary.startswith('Konferenza dwar X - '))
         self.assertNotIn('Nru:', summary)
-        self.assertEqual(html, '<p>' + summary + '</p>')
+        self.assertIn('\n\nAktar informazzjoni: ' + _LINK, summary)
+        self.assertIn('<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(_LINK), html)
 
     def test_no_label_still_appends_agenda(self):
-        html, summary = papi.build_sitting_texts(None, 'Title', None, self._DATE, _AGENDA_LINES)
+        html, summary = papi.build_sitting_texts(None, 'Title', None, self._DATE, _AGENDA_LINES, _LINK)
         self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
         self.assertIn('<p><strong>Aġenda:</strong></p>', html)
 
     def test_title_html_escaped_but_summary_stays_plain(self):
-        html, summary = papi.build_sitting_texts('Seduta', 'R&D <Committee>', 1, self._DATE, None)
+        html, summary = papi.build_sitting_texts('Seduta', 'R&D <Committee>', 1, self._DATE, None, _LINK)
         self.assertIn('R&D <Committee>', summary)
         self.assertIn('R&amp;D &lt;Committee&gt;', html)
         self.assertNotIn('<Committee>', html)
 
     def test_agenda_text_html_escaped_but_summary_stays_plain(self):
         lines = [('heading', 'A & B'), ('item', 'Bill <2024>')]
-        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, lines)
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, lines, _LINK)
         self.assertIn('A & B', summary)
         self.assertIn('Bill <2024>', summary)
         self.assertIn('A &amp; B', html)
         self.assertIn('Bill &lt;2024&gt;', html)
+
+    def test_link_appended_at_bottom_of_both_forms(self):
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES, _LINK)
+        self.assertTrue(summary.endswith('Aktar informazzjoni: ' + _LINK))
+        self.assertTrue(html.endswith(
+            '<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(_LINK)))
+
+    def test_link_survives_tag_stripping(self):
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES, _LINK)
+        stripped = re.sub(r'<[^>]+>', '', html)
+        self.assertIn('\nAktar informazzjoni: ' + _LINK, stripped)
+
+    def test_link_href_is_quote_escaped(self):
+        link = 'https://parlament.mt/mt/weird"page'
+        html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None, link)
+        self.assertIn('href="https://parlament.mt/mt/weird&quot;page"', html)
 
 
 class TestLabelAndTitleForSitting(unittest.TestCase):
@@ -501,7 +524,7 @@ class TestGetPlenaryCandidates(unittest.TestCase):
         self.assertEqual(candidate['source_audio_path'], _RIGHT_URL)
         self.assertEqual(candidate['kind'], 'plenary')
         self.assertEqual(candidate['title'], 'Sessjoni Plenarja S15E171')
-        self.assertEqual(candidate['link'], papi.PARLAMENT_URL + '/test')
+        self.assertEqual(candidate['link'], papi.PARLAMENT_URL + '/mt/test')
         self.assertEqual(candidate['source'], 'media-archive')
         self.assertEqual(candidate['pubdate'], papi.get_sitting_date(sitting))
 

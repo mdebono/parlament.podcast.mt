@@ -187,7 +187,7 @@ class TestGetCandidates(unittest.TestCase):
         self.assertEqual(candidate['source_audio_path'],
                          '/Audio/15thLeg/PAC/PAC%2012%2001-07-2026.mp3')
         self.assertEqual(candidate['link'],
-                         papi.PARLAMENT_URL + '/15th-leg/pac/meeting-12/')
+                         papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
         self.assertEqual(candidate['pubdate'].isoformat(), '2026-07-01T14:30:00+02:00')
 
     def test_committee_without_number_uses_date_title(self):
@@ -256,7 +256,9 @@ class TestBuildTexts(unittest.TestCase):
         [candidate] = latest.get_candidates(_LEG, [_make_event()])
         html, summary = candidate['build_texts']()
         self.assertTrue(summary.startswith('Konferenza dwar X - '))
-        self.assertEqual(html, '<p>' + summary + '</p>')
+        link = papi.PARLAMENT_URL + '/mt/15th-leg/events/conference-x/'
+        self.assertIn('\n\nAktar informazzjoni: ' + link, summary)
+        self.assertIn('<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(link), html)
         mock_agenda.assert_not_called()
 
     @patch('parlament.papi.get_agenda_lines_by_url', return_value=None)
@@ -265,7 +267,9 @@ class TestBuildTexts(unittest.TestCase):
         html, summary = candidate['build_texts']()
         self.assertTrue(summary.startswith(
             'Il-Ħmistax-il Leġiżlatura Seduta Nru: 171 - '))
-        self.assertEqual(html, '<p>' + summary + '</p>')
+        link = papi.PARLAMENT_URL + '/mt/15th-leg/plenary-session/ps-171/'
+        self.assertIn('\n\nAktar informazzjoni: ' + link, summary)
+        self.assertIn('<p>Aktar informazzjoni: <a href="{0}">{0}</a></p>'.format(link), html)
 
 
 if __name__ == '__main__':

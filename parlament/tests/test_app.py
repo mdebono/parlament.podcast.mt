@@ -342,6 +342,9 @@ class TestBackfillDescriptions(unittest.TestCase):
         self.assertIn('Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012', entry['description'])
         self.assertIn('Aġenda', entry['description'])
         self.assertIn('Aġenda', entry['summary'])
+        link = 'https://parlament.mt/mt/15th-leg/pac/meeting-12/'
+        self.assertIn('Aktar informazzjoni: <a href="{0}">{0}</a>'.format(link), entry['description'])
+        self.assertIn('Aktar informazzjoni: ' + link, entry['summary'])
 
     @patch('parlament.papi.cache.httpGet', return_value=_empty_page())
     def test_matched_plenary_entry_uses_legislature_title(self, mock_get):

@@ -131,20 +131,21 @@ def _build_texts(leg, meeting):
     kind = get_meeting_kind(meeting)
     number = get_meeting_number(meeting)
     date = parse_meeting_date(meeting['MeetingDate'])
+    link = papi.path_to_mt_url(meeting['MeetingURL'])
     lines = None
     if kind != 'event' and meeting.get('MeetingURL'):
-        lines = papi.get_agenda_lines_by_url(papi.path_to_mt_url(meeting['MeetingURL']))
+        lines = papi.get_agenda_lines_by_url(link)
     # Always delegate to the one shared builder (also used by app.py's
     # backfill), so a committee's wording can never drift from what a
     # re-match against the archive would produce - label=None covers
     # events and committees without a meeting number, where there's no
     # meaningful "Nru:" to show.
     if kind == 'plenary':
-        return papi.build_sitting_texts('Seduta', papi.get_leg_title(leg), number, date, lines)
+        return papi.build_sitting_texts('Seduta', papi.get_leg_title(leg), number, date, lines, link)
     elif kind == 'committee' and number:
-        return papi.build_sitting_texts('Laqgħa', title, number, date, lines)
+        return papi.build_sitting_texts('Laqgħa', title, number, date, lines, link)
     else:
-        return papi.build_sitting_texts(None, title, None, date, lines)
+        return papi.build_sitting_texts(None, title, None, date, lines, link)
 
 def _meeting_candidates(leg, meeting):
     audio_urls = meeting.get('AudioURLs') or []
@@ -169,7 +170,7 @@ def _meeting_candidates(leg, meeting):
             'source_audio_path': normalize_audio_path(audio_url),
             'kind': get_meeting_kind(meeting),
             'title': part_title,
-            'link': papi.PARLAMENT_URL + meeting['MeetingURL'],
+            'link': papi.path_to_mt_url(meeting['MeetingURL']),
             'pubdate': pubdate,
             'source': 'latest-media',
             'build_texts':
