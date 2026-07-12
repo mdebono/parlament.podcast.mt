@@ -108,6 +108,7 @@ def backfill_descriptions(store, leg):
             papi.get_sitting_number(sitting),
             papi.get_sitting_date(sitting),
             papi.get_sitting_agenda_lines(sitting),
+            papi.get_sitting_url_mt(sitting),
         )
         catalog.update_texts(entry, description, summary)
 

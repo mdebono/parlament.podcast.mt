@@ -62,9 +62,6 @@ def get_audio_content_length(audio_url):
         print(f'Warning: could not fetch Content-Length for {audio_url}: {e}')
         return ''
 
-def get_sitting_url(sitting):
-    return PARLAMENT_URL + sitting['Url']
-
 def path_to_mt_url(path):
     """Return the Maltese-language URL for a site path.
 
@@ -331,7 +328,7 @@ def get_sitting_agenda_lines(sitting):
     None if the page or the agenda section is unavailable."""
     return get_agenda_lines_by_url(get_sitting_url_mt(sitting))
 
-def build_sitting_texts(label, title, number, date, lines):
+def build_sitting_texts(label, title, number, date, lines, link):
     """Build (description_html, summary) for an episode. label is 'Seduta'
     (plenary), 'Laqgħa' (committee), or None for a meeting with no
     meaningful number to show (events, committees without one) - in which
@@ -339,7 +336,9 @@ def build_sitting_texts(label, title, number, date, lines):
     lines is the already-fetched structured agenda (from
     get_agenda_lines_by_url, or None) - callers control the one fetch this
     needs, and both text forms are built from the same source of truth so
-    they can never drift apart."""
+    they can never drift apart. link is the episode's Maltese-language page
+    URL, appended as a short "more information" line at the bottom of both
+    forms."""
     date_str = babel.dates.format_datetime(datetime=date, format=BABEL_MT_DATETIME_FORMAT, locale='mt')
     if label:
         preamble = '{title} {label} Nru: {number:03} - {date}'.format(
@@ -353,6 +352,9 @@ def build_sitting_texts(label, title, number, date, lines):
         # '\n' between blocks (see lines_to_html) so a naive tag-stripping
         # preview doesn't run "...16:00" straight into "Aġenda:...".
         html += '\n<p><strong>Aġenda:</strong></p>\n' + lines_to_html(lines)
+    summary += '\n\nAktar informazzjoni: ' + link
+    html += '\n<p>Aktar informazzjoni: <a href="{href}">{text}</a></p>'.format(
+        href=html_escape(link, quote=True), text=html_escape(link, quote=False))
     return html, summary
 
 def label_and_title_for_sitting(kind, leg, sitting):
@@ -379,6 +381,7 @@ def get_episode_texts(leg, sitting):
         get_sitting_number(sitting),
         get_sitting_date(sitting),
         get_sitting_agenda_lines(sitting),
+        get_sitting_url_mt(sitting),
     )
 
 def get_plenary_candidates(leg, sittings):
@@ -397,7 +400,7 @@ def get_plenary_candidates(leg, sittings):
             'source_audio_path': audio_path,
             'kind': 'plenary',
             'title': get_episode_title(leg, sitting),
-            'link': get_sitting_url(sitting),
+            'link': get_sitting_url_mt(sitting),
             'pubdate': get_sitting_date(sitting),
             'source': 'media-archive',
             'build_texts':
