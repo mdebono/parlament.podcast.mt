@@ -372,6 +372,58 @@ class TestBackfillDescriptions(unittest.TestCase):
         app.backfill_descriptions(store, _make_leg_with_committee())
         self.assertEqual(store['episodes'][key]['description'], 'stale')
 
+    def test_agenda_fetch_failure_leaves_entry_untouched_others_still_backfilled(self):
+        # A transient agenda-fetch failure for one entry must not overwrite
+        # its existing (possibly already-good) description with an
+        # agenda-less one, and must not stop other entries from being
+        # backfilled in the same run.
+        pac_key = mirror.prep_s3_key(_AUDIO_PAC)
+        plenary_key = mirror.prep_s3_key(_AUDIO_171)
+        store = self._store_with_entry('committee', pac_key, description='stale-pac')
+        store['episodes'][plenary_key] = {
+            'guid': 'g2', 'title': 't2', 'description': 'stale-plenary', 'link': 'l2',
+            'audio_url': 'a2', 'content_length': '1', 'pubdate': '2023-01-01T00:00:00+00:00',
+            'kind': 'plenary', 'sources': ['media-archive'], 'source_audio_path': '/y',
+            'first_seen': '2023-01-01T00:00:00+00:00',
+        }
+
+        def fake_get(url, referer=None):
+            if 'pac' in url:
+                raise Exception('simulated fetch failure')
+            return _empty_page()
+
+        with patch('parlament.papi.cache.httpGet', side_effect=fake_get):
+            app.backfill_descriptions(store, _make_leg_with_committee())
+
+        self.assertEqual(store['episodes'][pac_key]['description'], 'stale-pac')
+        self.assertNotEqual(store['episodes'][plenary_key]['description'], 'stale-plenary')
+        self.assertIn('Il-Ħmistax-il Leġiżlatura Seduta Nru: 171',
+                       store['episodes'][plenary_key]['description'])
+
+    def test_malformed_sitting_leaves_entry_untouched_others_still_backfilled(self):
+        # A non-agenda failure (missing/malformed archive field) must be
+        # just as harmless to the failed entry and to the rest of the run
+        # as an agenda-fetch failure.
+        pac_key = mirror.prep_s3_key(_AUDIO_PAC)
+        plenary_key = mirror.prep_s3_key(_AUDIO_171)
+        store = self._store_with_entry('committee', pac_key, description='stale-pac')
+        store['episodes'][plenary_key] = {
+            'guid': 'g2', 'title': 't2', 'description': 'stale-plenary', 'link': 'l2',
+            'audio_url': 'a2', 'content_length': '1', 'pubdate': '2023-01-01T00:00:00+00:00',
+            'kind': 'plenary', 'sources': ['media-archive'], 'source_audio_path': '/y',
+            'first_seen': '2023-01-01T00:00:00+00:00',
+        }
+        leg = _make_leg_with_committee()
+        del leg['Committees'][1]['Sittings'][0]['Date']  # malformed: get_sitting_date will KeyError
+
+        with patch('parlament.papi.cache.httpGet', return_value=_empty_page()):
+            app.backfill_descriptions(store, leg)
+
+        self.assertEqual(store['episodes'][pac_key]['description'], 'stale-pac')
+        self.assertNotEqual(store['episodes'][plenary_key]['description'], 'stale-plenary')
+        self.assertIn('Il-Ħmistax-il Leġiżlatura Seduta Nru: 171',
+                       store['episodes'][plenary_key]['description'])
+
 
 if __name__ == '__main__':
     unittest.main()

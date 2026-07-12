@@ -504,8 +504,14 @@ class TestGetAgendaLinesByUrl(unittest.TestCase):
                                          referer=papi.PARLAMENT_URL)
 
     @patch('parlament.papi.cache.httpGet', side_effect=Exception('timeout'))
-    def test_fetch_failure_returns_none(self, mock_get):
-        self.assertIsNone(papi.get_agenda_lines_by_url('https://parlament.mt/mt/test'))
+    def test_fetch_failure_raises(self, mock_get):
+        # Callers must be able to distinguish "fetch failed, status
+        # unknown" from "page fetched fine, confirmed no agenda" (a None
+        # return) - backfill in particular relies on this to avoid
+        # overwriting a known-good agenda with nothing on a transient
+        # failure.
+        with self.assertRaises(Exception):
+            papi.get_agenda_lines_by_url('https://parlament.mt/mt/test')
 
 
 class TestGetPlenaryCandidates(unittest.TestCase):
