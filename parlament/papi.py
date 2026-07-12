@@ -314,14 +314,15 @@ def parse_agenda_html(html):
 
 def get_agenda_lines_by_url(url):
     """Fetch a sitting/meeting page and return its agenda as structured
-    lines, or None if the page or the agenda section is unavailable."""
-    try:
-        response = cache.httpGet(url, referer=PARLAMENT_URL)
-        response.raise_for_status()
-        return _extract_agenda_lines(response.content)
-    except Exception as e:
-        print('Warning: could not fetch agenda from {}: {}'.format(url, e))
-        return None
+    lines, or None if the page was fetched successfully but has no agenda
+    section. Raises on fetch/parse failure - callers decide how to handle
+    that themselves: "agenda status unknown" and "confirmed no agenda"
+    need different treatment (backfill in particular must not overwrite an
+    already-known-good agenda with nothing just because of a transient
+    fetch error)."""
+    response = cache.httpGet(url, referer=PARLAMENT_URL)
+    response.raise_for_status()
+    return _extract_agenda_lines(response.content)
 
 def get_sitting_agenda_lines(sitting):
     """Fetch the sitting page and return its agenda as structured lines, or
@@ -375,12 +376,18 @@ def label_and_title_for_sitting(kind, leg, sitting):
 def get_episode_texts(leg, sitting):
     """Return (description_html, summary) for a plenary sitting."""
     label, title = label_and_title_for_sitting('plenary', leg, sitting)
+    try:
+        lines = get_sitting_agenda_lines(sitting)
+    except Exception as e:
+        print('Warning: could not fetch agenda for sitting {}: {}'.format(
+            get_sitting_number(sitting), e))
+        lines = None
     return build_sitting_texts(
         label,
         title,
         get_sitting_number(sitting),
         get_sitting_date(sitting),
-        get_sitting_agenda_lines(sitting),
+        lines,
         get_sitting_url_mt(sitting),
     )
 

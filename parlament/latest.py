@@ -134,7 +134,11 @@ def _build_texts(leg, meeting):
     link = papi.path_to_mt_url(meeting['MeetingURL'])
     lines = None
     if kind != 'event' and meeting.get('MeetingURL'):
-        lines = papi.get_agenda_lines_by_url(link)
+        try:
+            lines = papi.get_agenda_lines_by_url(link)
+        except Exception as e:
+            print('Warning: could not fetch agenda for meeting {}: {}'.format(
+                meeting.get('MeetingURL'), e))
     # Always delegate to the one shared builder (also used by app.py's
     # backfill), so a committee's wording can never drift from what a
     # re-match against the archive would produce - label=None covers

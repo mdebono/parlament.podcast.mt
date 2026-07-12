@@ -93,24 +93,43 @@ def backfill_descriptions(store, leg):
     Guid, title, link, pubdate, kind and sources are never touched - only
     these two text fields are refreshed. Entries the archive has no
     equivalent for (kind='event', or a committee meeting it no longer
-    carries) are left untouched."""
+    carries) are left untouched.
+
+    Each entry is rebuilt independently: a failure for one entry (e.g. a
+    transient agenda-fetch error) is logged and skipped rather than
+    aborting the whole run, and never touches that entry's existing
+    description/summary - a failure must never leave an entry worse off
+    than before the backfill ran."""
     index = archive_sitting_index(leg)
+    print('Backfilling descriptions for {} catalogued episode(s)'.format(len(store['episodes'])))
+    backfilled = skipped = failed = 0
     for key, entry in store['episodes'].items():
         sitting = index.get(key)
         if sitting is None:
+            skipped += 1
             continue
         label, title = papi.label_and_title_for_sitting(entry['kind'], leg, sitting)
         if label is None:
+            skipped += 1
             continue
-        description, summary = papi.build_sitting_texts(
-            label,
-            title,
-            papi.get_sitting_number(sitting),
-            papi.get_sitting_date(sitting),
-            papi.get_sitting_agenda_lines(sitting),
-            papi.get_sitting_url_mt(sitting),
-        )
+        try:
+            description, summary = papi.build_sitting_texts(
+                label,
+                title,
+                papi.get_sitting_number(sitting),
+                papi.get_sitting_date(sitting),
+                papi.get_sitting_agenda_lines(sitting),
+                papi.get_sitting_url_mt(sitting),
+            )
+        except Exception as e:
+            print(f'Warning: could not backfill {key}: {e}', file=sys.stderr)
+            failed += 1
+            continue
         catalog.update_texts(entry, description, summary)
+        print('Backfilled {}: {}'.format(key, entry['title']))
+        backfilled += 1
+    print('Backfill done: {} backfilled, {} skipped, {} failed'.format(
+        backfilled, skipped, failed))
 
 def build_feed(store):
     feed = pfeed.init_feed()

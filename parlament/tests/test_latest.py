@@ -251,6 +251,18 @@ class TestBuildTexts(unittest.TestCase):
         self.assertNotIn('Aġenda', summary)
         self.assertNotIn('Aġenda', html)
 
+    @patch('parlament.papi.get_agenda_lines_by_url', side_effect=Exception('timeout'))
+    def test_committee_texts_survive_agenda_fetch_failure(self, mock_agenda):
+        # A brand-new episode has no existing text to protect, so a fetch
+        # failure here should degrade the same way "no agenda" does, not
+        # raise and abort ingest of this candidate.
+        [candidate] = latest.get_candidates(_LEG, [_make_meeting()])
+        html, summary = candidate['build_texts']()
+        self.assertNotIn('Aġenda', summary)
+        self.assertNotIn('Aġenda', html)
+        self.assertTrue(summary.startswith(
+            'Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012 - '))
+
     @patch('parlament.papi.get_agenda_lines_by_url')
     def test_event_texts_never_fetch_agenda(self, mock_agenda):
         [candidate] = latest.get_candidates(_LEG, [_make_event()])
