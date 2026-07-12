@@ -240,7 +240,7 @@ class TestBuildTexts(unittest.TestCase):
         self.assertTrue(summary.startswith(
             'Kumitat dwar il-Kontijiet Pubbliċi Laqgħa Nru: 012 - '))
         self.assertIn('\n\nAġenda:\nPUNT\n- Xi ħaġa', summary)
-        self.assertIn('<p><strong>Aġenda:</strong></p><p><strong>PUNT</strong></p><ul><li>Xi ħaġa</li></ul>', html)
+        self.assertIn('<p><strong>Aġenda:</strong></p>\n<p><strong>PUNT</strong></p>\n<ul><li>Xi ħaġa</li></ul>', html)
         mock_agenda.assert_called_once_with(
             papi.PARLAMENT_URL + '/mt/15th-leg/pac/meeting-12/')
 

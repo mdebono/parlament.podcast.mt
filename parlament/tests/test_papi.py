@@ -1,3 +1,4 @@
+import re
 import unittest
 from datetime import datetime
 from unittest.mock import patch, MagicMock
@@ -346,14 +347,14 @@ class TestLinesToHtml(unittest.TestCase):
                  ('item', '2. House Business; and'),
                  ('item', '3. Other Matters')]
         self.assertEqual(papi.lines_to_html(lines),
-            '<ol><li>Confirmation of Minutes;</li>'
-            '<li>House Business; and</li>'
+            '<ol><li>Confirmation of Minutes;</li>\n'
+            '<li>House Business; and</li>\n'
             '<li>Other Matters</li></ol>')
 
     def test_unnumbered_items_stay_unordered_list_text_unchanged(self):
         lines = [('item', 'Mozzjoni Nru 15 - Xi Haga'), ('item', "Indirizz b'risposta")]
         self.assertEqual(papi.lines_to_html(lines),
-            '<ul><li>Mozzjoni Nru 15 - Xi Haga</li>'
+            '<ul><li>Mozzjoni Nru 15 - Xi Haga</li>\n'
             "<li>Indirizz b'risposta</li></ul>")
 
     def test_mixed_numbered_and_unnumbered_run_stays_unordered(self):
@@ -361,14 +362,26 @@ class TestLinesToHtml(unittest.TestCase):
         # mixed run keeps the full original text in a <ul>.
         lines = [('item', '1. Numbered'), ('item', 'Not numbered')]
         self.assertEqual(papi.lines_to_html(lines),
-            '<ul><li>1. Numbered</li><li>Not numbered</li></ul>')
+            '<ul><li>1. Numbered</li>\n<li>Not numbered</li></ul>')
 
     def test_numbered_items_in_separate_heading_groups_each_own_ol(self):
         lines = [('heading', 'A'), ('item', '1. First'), ('item', '2. Second'),
                  ('heading', 'B'), ('item', 'Plain')]
         self.assertEqual(papi.lines_to_html(lines),
-            '<p><strong>A</strong></p><ol><li>First</li><li>Second</li></ol>'
-            '<p><strong>B</strong></p><ul><li>Plain</li></ul>')
+            '<p><strong>A</strong></p>\n<ol><li>First</li>\n<li>Second</li></ol>\n'
+            '<p><strong>B</strong></p>\n<ul><li>Plain</li></ul>')
+
+    def test_tags_stripped_leaves_readable_whitespace(self):
+        # The actual failure mode this protects against: a naive preview
+        # renderer that deletes markup without inserting a separator at
+        # the boundary, which used to run adjacent blocks together with
+        # no space at all.
+        lines = [('heading', 'ORDNIJIET TAL-ĠURNATA'),
+                 ('item', 'Abbozz Nru 2 - Xi Haga'), ('item', 'Abbozz Nru 1 - Ohra')]
+        html = papi.lines_to_html(lines)
+        stripped = re.sub(r'<[^>]+>', '', html)
+        self.assertEqual(stripped,
+            'ORDNIJIET TAL-ĠURNATA\nAbbozz Nru 2 - Xi Haga\nAbbozz Nru 1 - Ohra')
 
 
 class TestBuildSittingTexts(unittest.TestCase):
@@ -390,7 +403,7 @@ class TestBuildSittingTexts(unittest.TestCase):
     def test_agenda_appended_when_present(self):
         html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, _AGENDA_LINES)
         self.assertIn('\n\nAġenda:\nMOZZJONIJIET\n- Xi Haga', summary)
-        self.assertIn('<p><strong>Aġenda:</strong></p><p><strong>MOZZJONIJIET</strong></p><ul><li>Xi Haga</li></ul>', html)
+        self.assertIn('<p><strong>Aġenda:</strong></p>\n<p><strong>MOZZJONIJIET</strong></p>\n<ul><li>Xi Haga</li></ul>', html)
 
     def test_agenda_omitted_when_none(self):
         html, summary = papi.build_sitting_texts('Seduta', 'Title', 1, self._DATE, None)

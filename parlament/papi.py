@@ -272,7 +272,15 @@ def lines_to_html(lines):
     as <ol> with the redundant leading number stripped (the <ol> already
     supplies it); otherwise <ul>, text unchanged. Text is HTML-escaped
     since it's sourced from the parliament site and may itself contain
-    '<' or '&'."""
+    '<' or '&'.
+
+    Every block-level piece (each <p>, the whole list, each <li>) is
+    joined with a real '\\n' rather than concatenated directly. Whitespace
+    between block elements is insignificant to any real HTML renderer, so
+    this is invisible there - but some podcast apps show a collapsed
+    preview by naively stripping tags without inserting a separator at the
+    boundary, which runs adjacent blocks together with no space at all
+    ("...16:00Aġenda:ORDNIJIET..."); the '\\n' survives that stripping."""
     parts = []
     items = []
 
@@ -284,7 +292,7 @@ def lines_to_html(lines):
         else:
             tag, rendered = 'ul', items
         parts.append('<{tag}>'.format(tag=tag)
-                     + ''.join('<li>{}</li>'.format(html_escape(text, quote=False)) for text in rendered)
+                     + '\n'.join('<li>{}</li>'.format(html_escape(text, quote=False)) for text in rendered)
                      + '</{tag}>'.format(tag=tag))
         items.clear()
 
@@ -295,7 +303,7 @@ def lines_to_html(lines):
         else:
             items.append(text)
     flush_items()
-    return ''.join(parts)
+    return '\n'.join(parts)
 
 def parse_agenda_html(html):
     """Extract the agenda from a sitting/meeting page as plain text, or
@@ -342,7 +350,9 @@ def build_sitting_texts(label, title, number, date, lines):
     html = '<p>{}</p>'.format(html_escape(preamble, quote=False))
     if lines:
         summary += '\n\nAġenda:\n' + lines_to_plain(lines)
-        html += '<p><strong>Aġenda:</strong></p>' + lines_to_html(lines)
+        # '\n' between blocks (see lines_to_html) so a naive tag-stripping
+        # preview doesn't run "...16:00" straight into "Aġenda:...".
+        html += '\n<p><strong>Aġenda:</strong></p>\n' + lines_to_html(lines)
     return html, summary
 
 def label_and_title_for_sitting(kind, leg, sitting):
