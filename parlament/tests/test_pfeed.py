@@ -189,16 +189,22 @@ class TestWriteFeedCdata(unittest.TestCase):
     def test_literal_cdata_close_sequence_falls_back_to_escaping(self):
         # ']]>' inside the content would prematurely close a CDATA
         # section - skip CDATA for that (rare) case rather than emit
-        # broken XML.
+        # broken XML. The channel description is unaffected and still
+        # gets CDATA-wrapped normally (it doesn't contain ']]>').
         content = self._write('<p>weird ]]> content</p>')
-        self.assertNotIn('<![CDATA[', content)
-        self.assertIn('&lt;p&gt;weird ]]&gt; content&lt;/p&gt;', content)
+        self.assertIn(
+            '<description>&lt;p&gt;weird ]]&gt; content&lt;/p&gt;</description>',
+            content)
 
-    def test_channel_description_untouched(self):
+    def test_channel_description_cdata_wrapped_with_links(self):
+        # The channel-level description carries real HTML links to both
+        # parlament.mt and the podcast site, so it needs the same CDATA
+        # treatment as per-item descriptions - not left entity-escaped.
         content = self._write('<p>desc</p>')
         self.assertIn(
-            "<description>Dan il-Podcast huwa ġabra inuffiċjali", content)
-        self.assertNotIn('<![CDATA[Dan il-Podcast', content)
+            '<description><![CDATA[Dan il-Podcast huwa ġabra inuffiċjali', content)
+        self.assertIn('<a href="https://parlament.mt/">', content)
+        self.assertIn('<a href="https://parlament.podcast.mt/">', content)
 
 
 if __name__ == '__main__':
