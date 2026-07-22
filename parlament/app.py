@@ -21,10 +21,16 @@ ARCHIVE_SITTING_LIMIT = 20
 def gather_candidates():
     """Collect candidates from both sources. Either source may fail without
     taking down the run; the catalogue still republishes everything known.
-    Returns (leg, candidates); leg is None if the media-archive fetch
-    itself failed (used both for plenary candidates and for backfilling)."""
+    Returns (leg, candidates, all_sources_failed); leg is None if the
+    media-archive fetch itself failed (used both for plenary candidates and
+    for backfilling). all_sources_failed is True only when every source
+    raised - as opposed to running cleanly and finding nothing new - so
+    callers can tell a total outage (e.g. the site blocking this runner)
+    apart from an ordinary quiet day."""
     leg = None
     candidates = []
+    failures = 0
+
     try:
         leg = papi.get_leg()
         sittings = papi.get_plenary_sittings(leg)
@@ -32,14 +38,16 @@ def gather_candidates():
         candidates += papi.get_plenary_candidates(leg, recent)
     except Exception as e:
         print(f'Warning: media-archive source failed: {e}', file=sys.stderr)
+        failures += 1
 
     try:
         meetings = latest.get_latest_media()
         candidates += latest.get_candidates(leg, meetings)
     except Exception as e:
         print(f'Warning: latest-media source failed: {e}', file=sys.stderr)
+        failures += 1
 
-    return leg, candidates
+    return leg, candidates, failures == 2
 
 def ingest(store, candidates):
     """Merge candidates into the catalogue, mirroring audio for new ones.
@@ -150,7 +158,12 @@ def run():
     store = catalog.load_catalog()
     previous_count = len(store['episodes'])
 
-    leg, candidates = gather_candidates()
+    leg, candidates, all_sources_failed = gather_candidates()
+    if all_sources_failed:
+        raise RuntimeError(
+            'all scrape sources failed (site likely blocking this runner); '
+            'aborting without republishing stale content'
+        )
     if not candidates and previous_count == 0:
         raise RuntimeError('no sources available and catalogue is empty; nothing to publish')
 
@@ -162,6 +175,8 @@ def run():
         else:
             print('Warning: cannot backfill without media-archive data', file=sys.stderr)
 
+    new_count = len(store['episodes'])
+
     # The catalogue write is the durable commit point: it happens after all
     # mirroring, so every entry has its mp3 in R2, and before the feed write,
     # so the published feed never gets ahead of the catalogue.
@@ -169,3 +184,5 @@ def run():
 
     feed = build_feed(store)
     pfeed.write_feed(feed, 'podcast.rss')
+    print('{} new episode(s) added'.format(new_count - previous_count)
+          if new_count != previous_count else 'no new episodes')
