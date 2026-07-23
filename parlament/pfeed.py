@@ -12,10 +12,10 @@ def init_feed():
     return PodcastFeed(
         title="Il-Podcast tal-Parlament",
         link="https://parlament.podcast.mt/",
-        description="Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-Parlament ta' Malta. Is-seduti jiġu ppublikati hawn il-ġurnata ta' wara li jseħħu. Għal aktar informazzjoni, żur is-sit ta' dan il-podcast.",
+        description="Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-<a href=\"https://parlament.mt/\">Parlament ta' Malta</a>. Is-seduti jiġu ppublikati hawn il-ġurnata ta' wara li jseħħu. Għal aktar informazzjoni dwar dan il-podcast, żur <a href=\"https://parlament.podcast.mt/\">parlament.podcast.mt</a>.",
         language="mt",
         image_url = "https://parlament.podcast.mt/img/parlament-logo.jpg",
-        owner="parlament@mdebono.com",
+        owner="parlament@podcast.mt",
         author="Il-Parlament ta' Malta",
         category="News & Politics",
     )
@@ -33,14 +33,16 @@ def add_item(feed, title, description, link, audio_url, content_length='', durat
     )
 
 def _wrap_descriptions_in_cdata(tree):
-    """Wrap each item's <description> in a CDATA section instead of
-    entity-escaping it. Both are XML-equivalent - any conformant parser
-    decodes them to the same string - but CDATA is the conventional way
-    podcast RSS feeds carry HTML-bearing fields and keeps the raw feed
-    source human-readable. Left entity-escaped (skipped) in the
-    vanishingly unlikely case the text contains a literal ']]>', which
-    would prematurely close a CDATA section."""
-    for description in tree.findall('.//item/description'):
+    """Wrap each item's <description>, and the channel's own <description>,
+    in a CDATA section instead of entity-escaping it. Both are
+    XML-equivalent - any conformant parser decodes them to the same string
+    - but CDATA is the conventional way podcast RSS feeds carry
+    HTML-bearing fields and keeps the raw feed source human-readable. Left
+    entity-escaped (skipped) in the vanishingly unlikely case the text
+    contains a literal ']]>', which would prematurely close a CDATA
+    section."""
+    descriptions = tree.findall('.//item/description') + tree.findall('./channel/description')
+    for description in descriptions:
         if description.text and ']]>' not in description.text:
             description.text = etree.CDATA(description.text)
 

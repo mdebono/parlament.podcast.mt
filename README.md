@@ -7,7 +7,7 @@
 
 Dan il-Podcast huwa ġabra inuffiċjali tas-seduti tal-Parlament ta' Malta.
 
-Primarjament qed inpoġġu s-seduti tal-Erbatax-il Leġislatura, jiġifieri dik li bdiet f'Mejju 2022. Kull lejl tiġi ċċekjata s-sit uffiċjali tal-Parlament għal seduti ġodda u dawn jiżdiedu bħala episodji f'dan il-podcast. B'hekk kull seduta ġdida tkun parti minn dan il-podcast il-ġurnata ta' wara.
+Dan il-podcast kien beda għall-Erbatax-il Leġislatura, u issa ġie mġedded għall-Ħmistax-il Leġiżlatura, li bdiet f'Ġunju 2026, biex ikopri kemm is-seduti plenarji kif ukoll il-laqgħat tal-kumitati, hekk kif isiru disponibbli. Kull lejl tiġi ċċekjata s-sit uffiċjali tal-Parlament għal seduti ġodda u dawn jiżdiedu bħala episodji f'dan il-podcast. B'hekk kull seduta ġdida tkun parti minn dan il-podcast il-ġurnata ta' wara.
 
 Dan il-podcast huwa biss ġabra tas-seduti f'forma utli ta' episodji f'podcast, jiġifieri l-episodji jinstemgħu direttament mis-sit tal-Parlament.
 
