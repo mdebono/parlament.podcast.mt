@@ -208,10 +208,25 @@ class TestRun(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_rolled_off_items_kept(self):
         store = self._run()
-        self._run(stored_catalog=store, leg=None, meetings=None)
+        # Both sources respond successfully but no longer list the older
+        # sittings/meetings (they've rolled off the archive/homepage
+        # window) - distinct from a source failing outright.
+        empty_leg = {'Number': 15, 'Title': 'Fifteenth Legislature',
+                     'TitleMT': 'Il-Ħmistax-il Leġiżlatura',
+                     'Committees': [{'CommitteeType': 'Plenary', 'Sittings': []}]}
+        self._run(stored_catalog=store, leg=empty_leg, meetings=[])
         items = _read_feed_items()
         self.assertEqual(len(items), 3)
         self.assertIn('Sessjoni Plenarja S15E171', [i['title'] for i in items])
+
+    # ------------------------------------------------------------------
+    # a total outage (every source raises) aborts loudly instead of
+    # silently republishing stale content
+    # ------------------------------------------------------------------
+    def test_total_source_outage_raises(self):
+        store = self._run()
+        with self.assertRaisesRegex(RuntimeError, 'all scrape sources failed'):
+            self._run(stored_catalog=store, leg=None, meetings=None)
 
     # ------------------------------------------------------------------
     # a mirroring failure skips only the failing item
