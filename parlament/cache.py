@@ -156,7 +156,10 @@ def httpGetFile(url, file_path, referer=None):
         }
         if referer:
             headers['Referer'] = referer
-        response = _session.get(url, headers=headers, timeout=HTTP_TIMEOUT)
+        response = _send_with_retry(
+            lambda: _session.get(url, headers=headers, timeout=HTTP_TIMEOUT),
+            'GETFILE {}'.format(url),
+        )
         with open(file_path, 'wb') as f:
             f.write(response.content)
         meta = _FileDownloadMeta(
