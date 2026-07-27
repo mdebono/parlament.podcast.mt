@@ -18,6 +18,7 @@ def init_feed():
         owner="parlament@podcast.mt",
         author="Il-Parlament ta' Malta",
         category="News & Politics",
+        new_feed_url="https://parlament.podcast.mt/rss/podcast.rss",
     )
 
 def add_item(feed, title, description, link, audio_url, content_length='', duration=None, pubdate=None, unique_id=None, summary=None):
