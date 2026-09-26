@@ -45,10 +45,12 @@ jobs:
           AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION || 'auto' }}
           FORCE_BACKFILL: ${{ inputs.force_backfill }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
         run: python -m parlament
 
-      - name: Copy RSS to public directory
-        run: mkdir -p public && cp podcast.rss public/rss
+      - name: Copy RSS and Spotify map to public directory
+        run: mkdir -p public && cp podcast.rss public/rss && cp parlament-spotify.json public/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

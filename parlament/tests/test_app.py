@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import json
 import os
 import tempfile
 import unittest
@@ -7,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 from lxml import etree
 
-from parlament import app, mirror, catalog
+from parlament import app, mirror, catalog, spotify
 
 # ---------------------------------------------------------------------------
 # fixtures
@@ -164,11 +165,17 @@ class TestRun(unittest.TestCase):
             stack.enter_context(patch('parlament.papi.cache.httpGet',
                                       return_value=agenda_page or _empty_page()))
             stack.enter_context(patch('parlament.papi.cache.httpHead'))
+            stack.enter_context(patch('parlament.spotify.update_map', return_value={}))
             if force_backfill:
                 stack.enter_context(patch.dict(os.environ, {'FORCE_BACKFILL': 'true'}))
             app.run()
 
         return written[-1] if written else None
+
+    def test_run_writes_spotify_map(self):
+        self._run()
+        with open('parlament-spotify.json', encoding='utf8') as fp:
+            self.assertEqual(json.load(fp), {'showUrl': spotify.SHOW_URL, 'episodes': {}})
 
     # ------------------------------------------------------------------
     # bootstrap run: archive items keep today's exact titles and guids

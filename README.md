@@ -12,3 +12,15 @@ Dan il-podcast kien beda għall-Erbatax-il Leġislatura, u issa ġie mġedded g�
 Dan il-podcast huwa biss ġabra tas-seduti f'forma utli ta' episodji f'podcast, jiġifieri l-episodji jinstemgħu direttament mis-sit tal-Parlament.
 
 **Ċaħda**: Dan il-Podcast mhux ikkontrollat mill-Parlament jew mill-Gvern ta' Malta u mhu bl-ebda mod jipprova jirrappreżenta l-ebda minnhom.
+
+## Minn parlament.mt għal Spotify
+
+Żid `podcast.mt/` quddiem il-link ta' seduta fuq parlament.mt biex tisma' dik is-seduta fuq Spotify:
+
+```
+podcast.mt/https://parlament.mt/mt/15th-leg/plenary-session/ps-017-04092026-0930-am/
+```
+
+podcast.mt jibgħat lil `parlament.podcast.mt/parlament.mt/...`, fejn `public/404.html` ifittex is-seduta f'`parlament-spotify.json` u jibgħatek għall-episodju. Dik il-mappa tinbena kull lejl minn `parlament/spotify.py`, li jqabbel it-titlu ta' kull episodju mal-episodju fuq Spotify bl-istess titlu, u tinżamm f'R2 (`catalog/spotify.json`).
+
+Biex jitlistaw l-episodji ta' Spotify hemm bżonn app mill-[Spotify developer dashboard](https://developer.spotify.com/dashboard), bil-credentials fis-secrets `SPOTIFY_CLIENT_ID` u `SPOTIFY_CLIENT_SECRET`. Mingħajrhom tintuża l-aħħar mappa maħżuna.

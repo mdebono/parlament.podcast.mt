@@ -5,6 +5,7 @@
 cache.pkl
 *.rss
 *.rss.tmp
+/parlament-spotify.json
 *.mp3
 data/
 models/

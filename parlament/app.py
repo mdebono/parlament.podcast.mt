@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 import sys
 
-from parlament import papi, latest, pfeed, mirror, catalog
+from parlament import papi, latest, pfeed, mirror, catalog, spotify
 
 # Candidates are plain dicts shared by both discovery sources
 # (papi.get_plenary_candidates, latest.get_candidates):
@@ -184,5 +184,6 @@ def run():
 
     feed = build_feed(store)
     pfeed.write_feed(feed, 'podcast.rss')
+    spotify.write_map(spotify.update_map(store), 'parlament-spotify.json')
     print('{} new episode(s) added'.format(new_count - previous_count)
           if new_count != previous_count else 'no new episodes')

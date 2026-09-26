@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="mt">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Il-Podcast tal-Parlament</title>
+        <meta name="robots" content="noindex">
+        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            .pending main { visibility: hidden; }
+            .miss-parlament, .parlament-miss .miss-default { display: none; }
+            .parlament-miss .miss-parlament { display: block; }
+        </style>
+        <script>
+            // Put parlament.podcast.mt/ (or podcast.mt/, which forwards here)
+            // in front of a parlament.mt sitting link to jump to its episode
+            // on Spotify. The map is built nightly by parlament/spotify.py.
+            document.documentElement.className = 'pending';
+            (function () {
+                // Keep in sync with parlament_key() in parlament/spotify.py.
+                function parlamentKey(url) {
+                    var m = String(url).trim()
+                        .match(/^\/{0,}(?:https?:\/{0,})?(?:www\.)?parlament\.mt(?=[\/?#]|$)(?:\/([^?#]*))?/i);
+                    if (!m) return null;
+                    var segments = (m[1] || '').toLowerCase().split('/').filter(Boolean);
+                    if (segments[0] === 'mt' || segments[0] === 'en') segments.shift();
+                    return segments.join('/');
+                }
+                function show(miss) {
+                    document.documentElement.className = miss ? 'parlament-miss' : '';
+                }
+
+                var path;
+                try { path = decodeURIComponent(location.pathname); } catch (e) { path = location.pathname; }
+                var key = parlamentKey(path);
+                if (key === null) { show(false); return; }
+
+                var original = 'https://parlament.mt/' +
+                    path.replace(/^\/{0,}(?:https?:\/{0,})?(?:www\.)?parlament\.mt\/?/i, '');
+                document.addEventListener('DOMContentLoaded', function () {
+                    document.getElementById('parlament-original').href = original;
+                });
+
+                fetch('/parlament-spotify.json')
+                    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+                    .then(function (data) {
+                        var target = key ? data.episodes[key] : data.showUrl;
+                        if (target) location.replace(target);
+                        else show(true);
+                    })
+                    .catch(function () { show(true); });
+            })();
+        </script>
+    </head>
+    <body>
+
+        <header class="hero">
+            <div class="hero-inner">
+                <h1>Il-Podcast tal-<span>Parlament</span></h1>
+            </div>
+        </header>
+
+        <main>
+            <article class="card miss-default">
+                <h2>Il-paġna ma nstabitx</h2>
+                <p>Din il-paġna ma teżistix. <a href="/">Mur fil-paġna ewlenija</a>.</p>
+            </article>
+
+            <article class="card miss-parlament">
+                <h2>Is-seduta ma nstabitx fuq Spotify</h2>
+                <p>Ma sibniex din is-seduta f'Il-Podcast tal-Parlament fuq Spotify. Is-seduti normalment jidhru l-ġurnata ta' wara li jsiru.</p>
+                <p>
+                    <a href="https://open.spotify.com/show/41wjGno413H9zT7NEJZxs6">Il-Podcast tal-Parlament fuq Spotify</a> ·
+                    <a id="parlament-original" href="https://parlament.mt/">Lura għal parlament.mt</a>
+                </p>
+            </article>
+        </main>
+
+        <footer>
+            <p><a href="/">parlament.podcast.mt</a></p>
+        </footer>
+
+    </body>
+</html>
