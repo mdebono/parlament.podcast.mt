@@ -3,7 +3,7 @@
 //   GET /?u=<…/umbraco/Api/…>&m=POST&ref=<page>     -> the API's answer (a POST without a body)
 //   GET /?u=<…>&m=HEAD                              -> JSON: url (after redirects), status, content length and type
 // If a KEY secret is set, every call must carry the header "x-fetch-key" equal to it.
-const UA = "parlament.podcast.mt/1.0 (unofficial podcast of Parliament's sittings; +https://github.com/mdebono/parlament.podcast.mt)";
+const UA = "Il-Podcast tal-Parlament/1.0 https://parlament.podcast.mt";
 const HOST = "parlament.mt";
 
 const isHost = (h) => h === HOST || h === "www." + HOST;

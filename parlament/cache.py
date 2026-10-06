@@ -16,8 +16,7 @@ RETRY_BACKOFF_SECONDS = (1, 2)  # delays before the 2nd and 3rd attempts
 GAP_SECONDS = float(os.environ.get('PARLAMENT_GAP', '2'))  # between requests
 
 # Our own user-agent, naming the podcast.
-USER_AGENT = ('parlament.podcast.mt/1.0 (unofficial podcast of Parliament\'s sittings; '
-              '+https://github.com/mdebono/parlament.podcast.mt)')
+USER_AGENT = 'Il-Podcast tal-Parlament/1.0 https://parlament.podcast.mt'
 
 # In CI every request goes through the fetch Worker (fetch/README.md):
 # PARLAMENT_VIA is its address; unset, requests go straight to parlament.mt.
