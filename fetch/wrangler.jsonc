@@ -1,0 +1,10 @@
+// The parlament.mt fetch Worker (fetch/README.md), run by the workflows as a preview: nothing is deployed.
+{
+  "name": "parlament-podcast-fetch",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-02",
+  "workers_dev": false,
+  "preview_urls": false,
+  // so the Worker's requests name the project's domain (D2)
+  "routes": [{ "pattern": "cf.podcast.mt/*", "zone_name": "podcast.mt" }]
+}

@@ -37,8 +37,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Start the parlament.mt fetch Worker (fetch/README.md)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::No CLOUDFLARE_API_TOKEN secret: parlament.mt can't be reached"; exit 1; fi
+          npx --yes wrangler@4 dev --remote --port 8787 -c fetch/wrangler.jsonc > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:8787/ && break; sleep 2; done
+          tail -5 wrangler.log
+
       - name: Run parliament script
         env:
+          PARLAMENT_VIA: http://127.0.0.1:8787
           S3_BUCKET: ${{ vars.S3_BUCKET }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -46,6 +57,10 @@ jobs:
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION || 'auto' }}
           FORCE_BACKFILL: ${{ inputs.force_backfill }}
         run: python -m parlament
+
+      - name: Worker log
+        if: failure()
+        run: tail -30 wrangler.log || true
 
       - name: Copy RSS to public directory
         run: mkdir -p public && cp podcast.rss public/rss
