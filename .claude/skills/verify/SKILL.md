@@ -6,10 +6,10 @@ description: Drive `python -m parlament` end-to-end in a sandbox with no access 
 # Verifying parlament.podcast.mt changes
 
 The runtime surface is `python -m parlament` (the daily CI job). parlament.mt
-is normally unreachable from dev sandboxes (its WAF blocks anything that isn't
-the curl_cffi Chrome-impersonated handshake, which agent proxies break), and
-there are no R2 credentials. Both boundaries can be faked without touching the
-app code:
+is unreachable from dev sandboxes (in CI
+the app goes through the fetch Worker, `fetch/worker.js`, via `PARLAMENT_VIA`),
+and there are no R2 credentials. Both boundaries can be faked without touching
+the app code:
 
 1. **R2/S3** — run a local moto server; boto3 picks up `AWS_ENDPOINT_URL`:
 
@@ -21,7 +21,10 @@ app code:
    python -c "import boto3; boto3.client('s3').create_bucket(Bucket='parlament-verify')"
    ```
 
-2. **parlament.mt HTTP** — pre-seed the app's own `cache.pkl` (its pickle HTTP
+2. **parlament.mt HTTP** — either point `PARLAMENT_VIA` at a stand-in for the
+   Worker (node can serve `fetch/worker.js` with a stubbed global `fetch`;
+   it speaks `/?u=<url>[&m=HEAD|POST][&ref=<page>]`, HEAD answers as JSON
+   `{url, status, bytes, type}`), or pre-seed the app's own `cache.pkl` (its pickle HTTP
    cache, keyed `('GET', url)` / `('POST', payload, url)`) with canned
    `cache._CachedResponse` objects for: the media-archive page + API, the
    homepage + GetLatestMediaFiles API, and the `/mt/...` agenda pages. Seed
