@@ -14,6 +14,7 @@ permissions:
   pages: write
   id-token: write
   contents: read
+  actions: write   # the keep-alive step
 
 jobs:
   deploy:
@@ -76,3 +77,11 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Keep the schedule alive
+        # GitHub turns off a public repo's schedules after 60 days without
+        # activity; re-enabling the workflow resets that count (D3).
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/pages.yml/enable"
