@@ -122,9 +122,17 @@ def _request(method, url, referer=None, stream=False):
             meta['content-length'] = str(info['bytes'])
         if info.get('type'):
             meta['content-type'] = info['type']
+        meta['x-fetch-colo'] = info.get('colo') or ''
+        meta['x-fetch-ray'] = info.get('cf_ray') or ''
         return _CachedResponse(info['status'], b'', info.get('url') or url, meta)
     response.url = url  # parlament.mt's address, not the Worker's, in errors and the cache
     return response
+
+def _served_from(response):
+    """', Worker colo X, cf-ray Y' for a response that came through the fetch Worker, else ''."""
+    headers = response.headers or {}
+    colo, ray = headers.get('x-fetch-colo'), headers.get('x-fetch-ray')
+    return ', Worker colo {}, cf-ray {}'.format(colo or 'unknown', ray or 'unknown') if VIA else ''
 
 def _send_with_retry(method, url, description, referer=None, stream=False):
     """Send a request, retrying with backoff on transient server errors.
@@ -148,8 +156,8 @@ def _send_with_retry(method, url, description, referer=None, stream=False):
         response = _request(method, url, referer, stream)
     if response.status_code == 403:
         _refused = description
-        print('Warning: {} refused with HTTP 403{}; no more requests this run'.format(
-            description, ' (via {})'.format(VIA) if VIA else ''))
+        print('Warning: {} refused with HTTP 403{}{}; no more requests this run'.format(
+            description, ' (via {})'.format(VIA) if VIA else '', _served_from(response)))
     return response
 
 def _remember(key, response):

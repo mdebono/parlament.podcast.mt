@@ -14,3 +14,7 @@ Each decision gets the next D-number: the decision, its status and date, and the
 - **Why:** GitHub turns off scheduled workflows in a public repository after 60 days without activity, and the nightly run never commits.
 - **How:** the last step of `pages.yml` calls the API's "enable workflow", which resets the count; the workflow's token has `actions: write` for it.
 
+
+**D4. A refusal says which Cloudflare colo served it.** _Accepted, 8 Oct 2026._
+- **Why:** a 403 from parlament.mt came without a hint of where the request was made from, so there was no way to see whether refusals follow particular edge locations.
+- **How:** the Worker adds `x-fetch-colo` (its own colo) and `x-fetch-ray` (parlament.mt's `cf-ray`) to the pages it passes through, and the same two values to a HEAD's JSON; at the first 403 `parlament/cache.py` prints `Worker colo <colo>, cf-ray <ray>` (`unknown` if absent). Without the Worker, nothing is added.
