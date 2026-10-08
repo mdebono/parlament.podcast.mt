@@ -21,6 +21,7 @@ class _Base(unittest.TestCase):
         cache.cache.clear()
         patches = [
             patch.object(cache, '_refused', None),
+            patch.object(cache, '_colos', {}),
             patch.object(cache, '_last_request', None),
             patch.object(cache, 'GAP_SECONDS', 0),
             patch.object(cache, 'VIA', ''),
@@ -179,6 +180,48 @@ class TestViaWorker(_Base):
         result = cache.httpHead('https://parlament.mt/a.mp3')
         self.assertEqual(result.status_code, 403)
         self.assertIsNotNone(cache._refused)
+
+    @patch('parlament.cache._session')
+    def test_403_names_the_colo(self, mock_session):
+        r = _response(403)
+        r.headers = {'x-fetch-colo': 'ARN', 'x-fetch-ray': '8a1b-ARN'}
+        mock_session.get.return_value = r
+        with patch.object(cache, 'VIA', 'http://127.0.0.1:8787'), patch('builtins.print') as out:
+            cache.httpGet('https://parlament.mt/a')
+        self.assertTrue(any('Worker colo ARN, cf-ray 8a1b-ARN' in c[0][0] for c in out.call_args_list))
+
+    @patch('parlament.cache._session')
+    def test_head_403_names_the_colo(self, mock_session):
+        mock_session.get.return_value = _response(200, json={'url': 'https://parlament.mt/a.mp3', 'status': 403,
+                                                             'colo': 'FRA', 'cf_ray': '9c2d-FRA'})
+        with patch.object(cache, 'VIA', 'http://127.0.0.1:8787'), patch('builtins.print') as out:
+            cache.httpHead('https://parlament.mt/a.mp3')
+        self.assertTrue(any('Worker colo FRA, cf-ray 9c2d-FRA' in c[0][0] for c in out.call_args_list))
+
+    @patch('parlament.cache._session')
+    def test_403_without_the_worker_names_no_colo(self, mock_session):
+        mock_session.request.return_value = _response(403)
+        with patch('builtins.print') as out:
+            cache.httpGet('https://parlament.mt/a')
+        self.assertFalse(any('colo' in c[0][0] for c in out.call_args_list))
+
+    @patch('parlament.cache._session')
+    def test_colos_line_counts_each_request(self, mock_session):
+        r = _response(200)
+        r.headers = {'x-fetch-colo': 'ARN'}
+        mock_session.get.side_effect = [r, r, _response(200, json={'url': 'u', 'status': 200, 'colo': 'FRA'})]
+        with patch.object(cache, 'VIA', 'http://127.0.0.1:8787'), patch('builtins.print') as out:
+            cache.httpGet('https://parlament.mt/a')
+            cache.httpGet('https://parlament.mt/b')
+            cache.httpHead('https://parlament.mt/c.mp3')
+            out.reset_mock()
+            cache.print_colos()
+        out.assert_called_once_with('colos: ARN 2, FRA 1')
+
+    def test_no_colos_line_without_the_worker(self):
+        with patch('builtins.print') as out:
+            cache.print_colos()
+        out.assert_not_called()
 
     @patch('parlament.cache._session')
     def test_key_header(self, mock_session):

@@ -1,3 +1,6 @@
-from parlament import app
+from parlament import app, cache
 
-app.run()
+try:
+    app.run()
+finally:
+    cache.print_colos()

@@ -28,6 +28,7 @@ _session = requests.Session()
 _session.headers['User-Agent'] = USER_AGENT
 _last_request = None  # time.monotonic() of the last request sent
 _refused = None       # description of the first 403
+_colos = {}           # the fetch Worker's colo -> requests it served
 
 
 class _CachedResponse:
@@ -114,17 +115,37 @@ def _request(method, url, referer=None, stream=False):
     if VIA_KEY:
         headers['x-fetch-key'] = VIA_KEY
     response = _session.get(via_url, headers=headers, timeout=HTTP_TIMEOUT, stream=stream)
-    if method == 'HEAD' and response.status_code == 200:
+    head = method == 'HEAD' and response.status_code == 200
+    if not head:
+        _count_colo(response.headers.get('x-fetch-colo'))
+    if head:
         # The Worker answers a HEAD with JSON describing parlament.mt's answer.
         info = response.json()
+        _count_colo(info.get('colo'))
         meta = {}
         if info.get('bytes'):
             meta['content-length'] = str(info['bytes'])
         if info.get('type'):
             meta['content-type'] = info['type']
+        meta['x-fetch-colo'] = info.get('colo') or ''
+        meta['x-fetch-ray'] = info.get('cf_ray') or ''
         return _CachedResponse(info['status'], b'', info.get('url') or url, meta)
     response.url = url  # parlament.mt's address, not the Worker's, in errors and the cache
     return response
+
+def _count_colo(colo):
+    _colos[colo or 'unknown'] = _colos.get(colo or 'unknown', 0) + 1
+
+def print_colos():
+    """One line: the Worker's colos and how many requests each served this run (nothing without the Worker)."""
+    if _colos:
+        print('colos: ' + ', '.join('{} {}'.format(c, n) for c, n in sorted(_colos.items())))
+
+def _served_from(response):
+    """', Worker colo X, cf-ray Y' for a response that came through the fetch Worker, else ''."""
+    headers = response.headers or {}
+    colo, ray = headers.get('x-fetch-colo'), headers.get('x-fetch-ray')
+    return ', Worker colo {}, cf-ray {}'.format(colo or 'unknown', ray or 'unknown') if VIA else ''
 
 def _send_with_retry(method, url, description, referer=None, stream=False):
     """Send a request, retrying with backoff on transient server errors.
@@ -148,8 +169,8 @@ def _send_with_retry(method, url, description, referer=None, stream=False):
         response = _request(method, url, referer, stream)
     if response.status_code == 403:
         _refused = description
-        print('Warning: {} refused with HTTP 403{}; no more requests this run'.format(
-            description, ' (via {})'.format(VIA) if VIA else ''))
+        print('Warning: {} refused with HTTP 403{}{}; no more requests this run'.format(
+            description, ' (via {})'.format(VIA) if VIA else '', _served_from(response)))
     return response
 
 def _remember(key, response):
