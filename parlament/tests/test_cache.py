@@ -21,6 +21,7 @@ class _Base(unittest.TestCase):
         cache.cache.clear()
         patches = [
             patch.object(cache, '_refused', None),
+            patch.object(cache, '_colos', {}),
             patch.object(cache, '_last_request', None),
             patch.object(cache, 'GAP_SECONDS', 0),
             patch.object(cache, 'VIA', ''),
@@ -203,6 +204,24 @@ class TestViaWorker(_Base):
         with patch('builtins.print') as out:
             cache.httpGet('https://parlament.mt/a')
         self.assertFalse(any('colo' in c[0][0] for c in out.call_args_list))
+
+    @patch('parlament.cache._session')
+    def test_colos_line_counts_each_request(self, mock_session):
+        r = _response(200)
+        r.headers = {'x-fetch-colo': 'ARN'}
+        mock_session.get.side_effect = [r, r, _response(200, json={'url': 'u', 'status': 200, 'colo': 'FRA'})]
+        with patch.object(cache, 'VIA', 'http://127.0.0.1:8787'), patch('builtins.print') as out:
+            cache.httpGet('https://parlament.mt/a')
+            cache.httpGet('https://parlament.mt/b')
+            cache.httpHead('https://parlament.mt/c.mp3')
+            out.reset_mock()
+            cache.print_colos()
+        out.assert_called_once_with('colos: ARN 2, FRA 1')
+
+    def test_no_colos_line_without_the_worker(self):
+        with patch('builtins.print') as out:
+            cache.print_colos()
+        out.assert_not_called()
 
     @patch('parlament.cache._session')
     def test_key_header(self, mock_session):

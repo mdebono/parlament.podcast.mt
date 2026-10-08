@@ -18,3 +18,7 @@ Each decision gets the next D-number: the decision, its status and date, and the
 **D4. A refusal says which Cloudflare colo served it.** _Accepted, 8 Oct 2026._
 - **Why:** a 403 from parlament.mt came without a hint of where the request was made from, so there was no way to see whether refusals follow particular edge locations.
 - **How:** the Worker adds `x-fetch-colo` (its own colo) and `x-fetch-ray` (parlament.mt's `cf-ray`) to the pages it passes through, and the same two values to a HEAD's JSON; at the first 403 `parlament/cache.py` prints `Worker colo <colo>, cf-ray <ray>` (`unknown` if absent). Without the Worker, nothing is added.
+
+**D5. Every run ends with a line saying which colos served its requests.** _Accepted, 8 Oct 2026._
+- **Why:** D4 names the colo only at a refusal, leaving nothing to compare it with.
+- **How:** `parlament/cache.py` counts the colo of every request made through the Worker; `python -m parlament` prints `colos: ARN 11, FRA 2` when it ends, also after an error. Nothing is kept between runs.
